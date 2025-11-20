@@ -1,0 +1,7 @@
+{
+  "name": "Krishna Hostel - Student Dashboard",
+  "description": "A smart complaint management system for students featuring AI-powered categorization, urgency detection, and timeline tracking.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
