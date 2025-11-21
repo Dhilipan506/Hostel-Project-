@@ -4,13 +4,16 @@ import Auth from './components/Auth';
 import ComplaintForm from './components/ComplaintForm';
 import ComplaintList from './components/ComplaintList';
 import DashboardStats from './components/DashboardStats';
+import AdminDashboard from './components/AdminDashboard';
 import Announcements from './components/Announcements';
 import Attendance from './components/Attendance';
-import { User, Complaint, ComplaintStatus, Category, Urgency, Announcement, WorkerStatus } from './types';
-import { LayoutDashboard, ClipboardList, Plus, Bell, LogOut, User as UserIcon, Home, X, Camera, MapPin, Phone, Calendar, Heart, CreditCard, Users, PenTool, Shield, Key, Lock, CheckCircle2, AlertCircle } from 'lucide-react';
-import { fileToGenerativePart } from './services/geminiService';
+import LeavePortal from './components/LeavePortal';
+import UserManagement from './components/UserManagement';
+import { User, Complaint, ComplaintStatus, Category, Urgency, Announcement, WorkerStatus, LeaveRequest, UserRequest, UserRole } from './types';
+import { LayoutDashboard, ClipboardList, Plus, Bell, LogOut, User as UserIcon, Home, X, Camera, MapPin, Phone, Calendar, Heart, CreditCard, Users, PenTool, Shield, Key, Lock, CheckCircle2, AlertCircle, Briefcase, Menu } from 'lucide-react';
 
-// MOCK DATA
+// --- MOCK DATA INITIALIZATION ---
+
 const INITIAL_COMPLAINTS: Complaint[] = [
   {
     id: '123456789-302A-1',
@@ -20,7 +23,7 @@ const INITIAL_COMPLAINTS: Complaint[] = [
     title: 'BROKEN REGULATOR',
     description: 'The fan regulator in room 101 is not working at all.',
     cleanDescription: 'The ceiling fan regulator in Room 101 is unresponsive and needs replacement.',
-    imageUrl: 'https://picsum.photos/400/300',
+    imageUrl: 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?w=800&q=80',
     category: Category.ELECTRICAL,
     urgency: Urgency.MEDIUM,
     status: ComplaintStatus.COMPLETED,
@@ -29,7 +32,8 @@ const INITIAL_COMPLAINTS: Complaint[] = [
     review: { rating: 4, comment: 'Fixed quickly, thanks.' },
     assignedWorker: 'Ramesh (Electrician)',
     startDate: '2023-10-20',
-    estimatedCompletion: '2023-10-21T14:00'
+    estimatedCompletion: '2023-10-21T14:00',
+    proofImages: { reached: 'base64mock', working: 'base64mock', completed: 'base64mock' }
   },
   {
     id: '123456789-302A-2',
@@ -39,7 +43,7 @@ const INITIAL_COMPLAINTS: Complaint[] = [
     title: 'LEAKING TAP',
     description: 'Water is dripping continuously.',
     cleanDescription: 'Persistent water leakage observed from the main tap in the shared bathroom.',
-    imageUrl: 'https://picsum.photos/400/301',
+    imageUrl: 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?w=800&q=80',
     category: Category.PLUMBING,
     urgency: Urgency.HIGH,
     status: ComplaintStatus.ASSIGNED,
@@ -56,7 +60,7 @@ const INITIAL_COMPLAINTS: Complaint[] = [
     title: 'BROKEN CHAIR',
     description: 'My study chair is broken.',
     cleanDescription: 'Wooden study chair in Room 302 has a fractured leg and is unstable.',
-    imageUrl: 'https://picsum.photos/400/302',
+    imageUrl: 'https://images.unsplash.com/photo-1503602642458-23211144584b?w=800&q=80',
     category: Category.FURNITURE,
     urgency: Urgency.LOW,
     status: ComplaintStatus.SUBMITTED,
@@ -71,669 +75,441 @@ const INITIAL_ANNOUNCEMENTS: Announcement[] = [
     content: 'The main water tank cleaning is scheduled for this Saturday, 10 AM to 2 PM. Water supply will be interrupted during these hours. Please store water accordingly.',
     date: 'Oct 24, 2023',
     author: 'CHIEF WARDEN',
-    reactions: { thumbsUp: 12, thumbsDown: 2 },
-    userReaction: null,
-    feedback: [
-      {userId: 'REG-23-002', userName: 'V. Singh', reason: 'During exam time?'}, 
-      {userId: 'REG-23-008', userName: 'K. Rahul', reason: 'Please reschedule'}
-    ]
+    targetAudience: 'student',
+    reactions: { thumbsUp: 12, thumbsDown: 1 },
+    userReaction: null
   },
   {
     id: '2',
-    title: 'QUIET HOURS POLICY',
-    content: 'Students are reminded to observe quiet hours from 10 PM to 6 AM to ensure a conducive study environment for everyone during exam week.',
-    date: 'Oct 20, 2023',
-    author: 'WARDEN OFFICE',
-    reactions: { thumbsUp: 45, thumbsDown: 1 },
-    userReaction: 'thumbsUp',
-    feedback: []
+    title: 'DIWALI LEAVE APPLICATIONS',
+    content: 'All students planning to go home for Diwali must submit their leave requests by Wednesday. Late applications will not be approved.',
+    date: 'Oct 22, 2023',
+    author: 'ADMIN',
+    targetAudience: 'student',
+    reactions: { thumbsUp: 45, thumbsDown: 0 },
+    userReaction: null
+  },
+  {
+    id: '3',
+    title: 'STAFF MEETING',
+    content: 'Mandatory meeting for all maintenance staff (Electricians & Plumbers) at the Warden Office at 5 PM today.',
+    date: 'Oct 25, 2023',
+    author: 'CHIEF WARDEN',
+    targetAudience: 'worker',
+    reactions: { thumbsUp: 5, thumbsDown: 0 },
+    userReaction: null
   }
 ];
 
-const App: React.FC = () => {
-  const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [showForm, setShowForm] = useState(false);
+const INITIAL_LEAVE_REQUESTS: LeaveRequest[] = [
+  {
+    id: 'L-001',
+    userId: '123456789',
+    userName: 'Arjun Reddy',
+    userRole: 'student',
+    fromDate: '2023-11-10',
+    toDate: '2023-11-15',
+    reason: 'Going home for Diwali festival.',
+    status: 'Pending',
+    roomNumber: '302-A'
+  },
+  {
+    id: 'L-002',
+    userId: 'WORKER-01',
+    userName: 'Ramesh Kumar',
+    userRole: 'worker',
+    fromDate: '2023-11-01',
+    toDate: '2023-11-02',
+    reason: 'Personal medical checkup.',
+    status: 'Approved',
+    roomNumber: 'MAINTENANCE'
+  }
+];
+
+const INITIAL_USERS: User[] = [
+  {
+    registerNumber: 'ADMIN',
+    name: 'System Admin',
+    role: 'admin',
+    roomNumber: 'SERVER ROOM',
+    phoneNumber: '0000000000'
+  },
+  {
+    registerNumber: 'WARDEN-01',
+    name: 'Mr. Sharma',
+    role: 'warden',
+    roomNumber: 'OFFICE',
+    phoneNumber: '9876543210'
+  },
+  {
+    registerNumber: '123456789',
+    name: 'Arjun Reddy',
+    role: 'student',
+    roomNumber: '302-A',
+    phoneNumber: '9988776655',
+    fatherName: 'Rajesh Reddy',
+    address: 'Hyderabad, India',
+    hostelValidUpto: '2025-05-20'
+  },
+  {
+    registerNumber: '123456790',
+    name: 'Vikram Singh',
+    role: 'student',
+    roomNumber: '302-B',
+    phoneNumber: '9988776644'
+  },
+  {
+    registerNumber: 'WORKER-01',
+    name: 'Ramesh (Electrician)',
+    role: 'worker',
+    roomNumber: 'MAINTENANCE',
+    phoneNumber: '8877665544',
+    workCategory: 'Electrical',
+    currentStatus: 'Free'
+  },
+  {
+    registerNumber: 'WORKER-02',
+    name: 'Suresh (Plumber)',
+    role: 'worker',
+    roomNumber: 'MAINTENANCE',
+    phoneNumber: '8877665533',
+    workCategory: 'Plumbing',
+    currentStatus: 'Busy'
+  }
+];
+
+const INITIAL_USER_REQUESTS: UserRequest[] = [
+  {
+    id: 'REQ-001',
+    requestedBy: 'WARDEN',
+    userType: 'student',
+    name: 'Rahul Dravid',
+    identifier: '123450000',
+    status: 'Pending',
+    phoneNumber: '9090909090',
+    dob: '2001-01-01',
+    fatherName: 'Sharad Dravid',
+    roomNumber: '101-A'
+  }
+];
+
+const App = () => {
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [activeTab, setActiveTab] = useState('dashboard');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  
+  // Data States
   const [complaints, setComplaints] = useState<Complaint[]>(INITIAL_COMPLAINTS);
   const [announcements, setAnnouncements] = useState<Announcement[]>(INITIAL_ANNOUNCEMENTS);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>(INITIAL_LEAVE_REQUESTS);
+  const [users, setUsers] = useState<User[]>(INITIAL_USERS);
+  const [userRequests, setUserRequests] = useState<UserRequest[]>(INITIAL_USER_REQUESTS);
   
-  // Profile Modal State
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [tempUser, setTempUser] = useState<User | null>(null);
-  
-  // Password Change State
-  const [currentPassInput, setCurrentPassInput] = useState('');
-  const [newPassInput, setNewPassInput] = useState('');
-  const [isPassVerified, setIsPassVerified] = useState(false);
-  const [passMsg, setPassMsg] = useState('');
+  const [showComplaintForm, setShowComplaintForm] = useState(false);
 
-  useEffect(() => {
-    const savedUser = localStorage.getItem('hostelmate_user');
-    if (savedUser) {
-      const u = JSON.parse(savedUser);
-      setUser(u);
-    }
-  }, []);
-
-  const handleLogin = (userData: User) => {
-    setUser(userData);
-    localStorage.setItem('hostelmate_user', JSON.stringify(userData));
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
+    // Reset to dashboard on login
     setActiveTab('dashboard');
   };
 
   const handleLogout = () => {
-    setUser(null);
-    localStorage.removeItem('hostelmate_user');
-    setIsProfileOpen(false);
+    setCurrentUser(null);
+    setShowComplaintForm(false);
   };
 
-  const handleNewComplaint = (complaint: Complaint) => {
-    if (!user) return;
+  // --- HANDLERS ---
 
-    // Generate Custom ID: RegNo-RoomNo-Timestamp
-    const timestamp = new Date().toISOString().replace(/[-:T.]/g, '').slice(0, 14);
-    const customId = `${user.registerNumber}-${user.roomNumber}-${timestamp}`;
-
-    const complaintWithUser = { 
+  const addComplaint = (complaint: Complaint) => {
+    const newId = `${currentUser?.registerNumber}-${Date.now()}`;
+    setComplaints([{
       ...complaint, 
-      id: customId,
-      studentId: user.registerNumber,
-      studentName: user.name,
-      studentRoom: user.roomNumber
-    };
-    setComplaints([complaintWithUser, ...complaints]);
-    setShowForm(false);
-    setActiveTab('complaints');
+      id: newId, 
+      studentId: currentUser!.registerNumber,
+      studentName: currentUser!.name,
+      studentRoom: currentUser!.roomNumber
+    }, ...complaints]);
+    setShowComplaintForm(false);
   };
 
-  const handleReviewSubmit = (id: string, rating: number, comment: string) => {
+  const updateComplaintStatus = (id: string, status: ComplaintStatus, updates?: Partial<Complaint>) => {
     setComplaints(complaints.map(c => 
-      c.id === id ? { ...c, review: { rating, comment } } : c
+      c.id === id ? { ...c, status, ...updates } : c
     ));
   };
 
-  const handleUpdateStatus = (id: string, status: ComplaintStatus, updates?: Partial<Complaint>) => {
-    setComplaints(complaints.map(c => 
-       c.id === id ? { ...c, status, ...updates } : c
-    ));
-  };
-
-  const handleDeleteComplaint = (id: string) => {
-    setComplaints(complaints.filter(c => c.id !== id));
+  const addAnnouncement = (announcement: Announcement) => {
+    setAnnouncements([announcement, ...announcements]);
   };
 
   const handleReaction = (id: string, type: 'thumbsUp' | 'thumbsDown', feedback?: string) => {
     setAnnouncements(announcements.map(a => {
-      if (a.id !== id) return a;
-      const newReactions = { ...a.reactions };
-      
-      // If clicking same reaction, remove it
-      if (a.userReaction === type) {
-        newReactions[type]--;
-        return { ...a, reactions: newReactions, userReaction: null };
-      } 
-      
-      // If clicking different reaction, remove old and add new
-      if (a.userReaction) {
-        newReactions[a.userReaction]--;
+      if (a.id === id) {
+        const newReactions = { ...a.reactions };
+        
+        // Remove previous reaction if exists
+        if (a.userReaction === 'thumbsUp') newReactions.thumbsUp--;
+        if (a.userReaction === 'thumbsDown') newReactions.thumbsDown--;
+        
+        // Add new reaction if different
+        if (a.userReaction !== type) {
+           newReactions[type]++;
+           return { ...a, reactions: newReactions, userReaction: type, feedback: feedback ? [...(a.feedback || []), { userId: currentUser!.registerNumber, userName: currentUser!.name, reason: feedback }] : a.feedback };
+        } else {
+           // Toggle off
+           return { ...a, reactions: newReactions, userReaction: null };
+        }
       }
-      newReactions[type]++;
-
-      // Handle Feedback Storage
-      let newFeedback = a.feedback || [];
-      if (type === 'thumbsDown' && feedback && user) {
-        newFeedback = [...newFeedback, { userId: user.registerNumber, userName: user.name, reason: feedback }];
-      }
-
-      return { ...a, reactions: newReactions, userReaction: type, feedback: newFeedback };
+      return a;
     }));
   };
 
-  const handleCreateAnnouncement = (announcement: Announcement) => {
-     setAnnouncements([announcement, ...announcements]);
-  };
-
-  const handleDeleteAnnouncement = (id: string) => {
+  const deleteAnnouncement = (id: string) => {
     setAnnouncements(announcements.filter(a => a.id !== id));
   };
 
-  const openProfile = () => {
-    setTempUser(user ? { ...user } : null);
-    // Reset Password State
-    setCurrentPassInput('');
-    setNewPassInput('');
-    setIsPassVerified(false);
-    setPassMsg('');
-    setIsProfileOpen(true);
+  const handleAddLeaveRequest = (req: LeaveRequest) => {
+    setLeaveRequests([req, ...leaveRequests]);
   };
 
-  const verifyPassword = () => {
-    if (!user) return;
-    if (currentPassInput === user.password) {
-      setIsPassVerified(true);
-      setPassMsg('');
-    } else {
-      setPassMsg('Incorrect password.');
-      setIsPassVerified(false);
+  const handleUpdateLeaveStatus = (id: string, status: 'Approved' | 'Rejected') => {
+    setLeaveRequests(leaveRequests.map(r => r.id === id ? { ...r, status } : r));
+  };
+
+  const handleAddUserRequest = (req: UserRequest) => {
+    setUserRequests([req, ...userRequests]);
+  };
+
+  const handleApproveUser = (reqId: string, newUser: User) => {
+    setUsers([...users, newUser]);
+    setUserRequests(userRequests.filter(r => r.id !== reqId));
+  };
+
+  const handleDeleteUser = (regNo: string) => {
+    setUsers(users.filter(u => u.registerNumber !== regNo));
+  };
+
+  // --- RENDER CONTENT ---
+
+  const renderContent = () => {
+    if (showComplaintForm) {
+      return <ComplaintForm onComplaintAdded={addComplaint} onCancel={() => setShowComplaintForm(false)} />;
     }
-  };
 
-  const saveProfile = () => {
-    if (tempUser) {
-      const updatedUser = { ...tempUser };
+    switch (activeTab) {
+      case 'dashboard':
+        if (currentUser?.role === 'admin') {
+          return (
+            <AdminDashboard 
+              users={users}
+              complaints={complaints}
+              leaveRequests={leaveRequests}
+            />
+          );
+        }
+        return <DashboardStats complaints={complaints} userRole={currentUser!.role} />;
       
-      // Update password only if verified and new password is provided
-      if (isPassVerified && newPassInput) {
-        updatedUser.password = newPassInput;
-      }
+      case 'complaints':
+        return (
+          <ComplaintList 
+            complaints={
+              currentUser?.role === 'student' 
+              ? complaints.filter(c => c.studentId === currentUser.registerNumber)
+              : currentUser?.role === 'worker'
+                ? complaints.filter(c => c.assignedWorker?.includes(currentUser.name))
+                : complaints // Admin/Warden see all
+            }
+            userRole={currentUser!.role}
+            availableWorkers={users.filter(u => u.role === 'worker')}
+            onReviewSubmit={(id, r, c) => {
+               setComplaints(complaints.map(comp => comp.id === id ? { ...comp, review: { rating: r, comment: c } } : comp));
+            }}
+            onUpdateStatus={updateComplaintStatus}
+            onDelete={currentUser?.role === 'admin' ? (id) => setComplaints(complaints.filter(c => c.id !== id)) : undefined}
+          />
+        );
+      
+      case 'announcements':
+        return (
+          <Announcements 
+            announcements={announcements} 
+            userRole={currentUser!.role} 
+            onReact={handleReaction}
+            onCreate={handleAddAnnouncement}
+            onDelete={deleteAnnouncement}
+          />
+        );
 
-      setUser(updatedUser);
-      localStorage.setItem('hostelmate_user', JSON.stringify(updatedUser));
-      setIsProfileOpen(false);
-    }
-  };
+      case 'attendance':
+        return <Attendance userRole={currentUser!.role} currentUser={currentUser!} />;
 
-  const handleProfileImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files[0] && tempUser) {
-      try {
-        const part = await fileToGenerativePart(e.target.files[0]);
-        setTempUser({
-          ...tempUser,
-          profileImage: `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`
-        });
-      } catch (err) {
-        console.error("Failed to load image", err);
-      }
-    }
-  };
+      case 'leaves':
+        return (
+          <LeavePortal 
+            requests={leaveRequests}
+            userRole={currentUser!.role}
+            currentUser={currentUser!}
+            onAddRequest={handleAddLeaveRequest}
+            onUpdateStatus={handleUpdateLeaveStatus}
+          />
+        );
 
-  // FILTER LOGIC
-  const getFilteredComplaints = () => {
-    if (!user) return [];
-    switch (user.role) {
-      case 'student':
-        // Students only see their own
-        return complaints.filter(c => c.studentId === user.registerNumber);
-      case 'worker':
-        // Workers see assigned tasks
-        return complaints.filter(c => c.assignedWorker && user.name.includes(c.assignedWorker.split(' ')[0]));
-      case 'warden':
-      case 'admin':
-        // Warden/Admin see everything
-        return complaints;
+      case 'users':
+        if (currentUser?.role !== 'warden' && currentUser?.role !== 'admin') return null;
+        return (
+          <UserManagement 
+            userRole={currentUser.role}
+            users={users}
+            requests={userRequests}
+            onAddRequest={handleAddUserRequest}
+            onApproveRequest={handleApproveUser}
+            onDeleteUser={handleDeleteUser}
+          />
+        );
+
       default:
-        return [];
+        return <DashboardStats complaints={complaints} userRole={currentUser!.role} />;
     }
   };
 
-  const filteredComplaints = getFilteredComplaints();
+  const handleAddAnnouncement = (announcement: Announcement) => {
+    setAnnouncements([announcement, ...announcements]);
+  };
 
-  if (!user) {
+  if (!currentUser) {
     return <Auth onLogin={handleLogin} />;
   }
 
+  const MenuButton = ({ id, icon: Icon, label, count }: { id: string, icon: any, label: string, count?: number }) => (
+    <button 
+      onClick={() => { setActiveTab(id); setShowComplaintForm(false); }}
+      className={`w-full flex items-center justify-between px-4 py-3 rounded-xl mb-1 transition-all duration-200 group ${
+        activeTab === id 
+        ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/30' 
+        : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+      }`}
+    >
+      <div className="flex items-center gap-3">
+        <Icon size={18} className={`${activeTab === id ? 'text-white' : 'text-slate-500 group-hover:text-white'}`} />
+        <span className="text-xs font-bold uppercase tracking-wide">{label}</span>
+      </div>
+      {count !== undefined && count > 0 && (
+        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+          activeTab === id ? 'bg-white/20 text-white' : 'bg-slate-700 text-slate-300'
+        }`}>
+          {count}
+        </span>
+      )}
+    </button>
+  );
+
   return (
-    <div className="min-h-screen bg-[#f8fafc] flex flex-col md:flex-row font-sans text-slate-900">
-      
+    <div className="min-h-screen bg-slate-50 flex font-sans">
       {/* Sidebar */}
-      <aside className={`hidden md:flex flex-col w-64 border-r border-slate-200 h-screen sticky top-0 z-10 ${user.role === 'admin' || user.role === 'warden' ? 'bg-slate-900 text-white' : 'bg-white text-slate-700'}`}>
-        <div className="p-6 border-b border-slate-700/50 flex items-center gap-3">
-          <div className={`p-2 rounded-md ${user.role === 'student' ? 'bg-blue-600 text-white' : 'bg-white/10 text-white'}`}>
-             {user.role === 'student' && <Home size={20} />}
-             {user.role === 'warden' && <Shield size={20} />}
-             {user.role === 'worker' && <PenTool size={20} />}
-             {user.role === 'admin' && <LayoutDashboard size={20} />}
-          </div>
-          <div>
-            <h1 className="text-lg font-extrabold uppercase tracking-tighter leading-none">Krishna Hostel</h1>
-            <p className="text-[10px] uppercase font-bold mt-1 opacity-50">
-              {user.role} Access
-            </p>
-          </div>
+      <div className={`fixed inset-y-0 left-0 z-50 w-64 bg-slate-900 transform transition-transform duration-300 ease-in-out ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:relative md:translate-x-0 flex flex-col`}>
+        <div className="p-6 flex flex-col items-center border-b border-slate-800">
+           <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-blue-700 rounded-2xl flex items-center justify-center shadow-xl mb-4 text-white">
+             <Shield size={32} />
+           </div>
+           <h1 className="text-lg font-extrabold text-white uppercase tracking-wider">Krishna Hostel</h1>
+           <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-1">Management System</p>
         </div>
-        
-        <nav className="flex-1 p-4 space-y-2">
-          <button 
-            onClick={() => { setActiveTab('dashboard'); setShowForm(false); }}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all text-xs font-bold uppercase tracking-wide ${activeTab === 'dashboard' ? (user.role === 'student' || user.role === 'worker' ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-white') : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
-          >
-            <LayoutDashboard size={18} />
-            <span>Dashboard</span>
-          </button>
-          
-          <button 
-            onClick={() => { setActiveTab('complaints'); setShowForm(false); }}
-            className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all text-xs font-bold uppercase tracking-wide ${activeTab === 'complaints' ? (user.role === 'student' || user.role === 'worker' ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-white') : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
-          >
-            <ClipboardList size={18} />
-            <span>
-              {user.role === 'student' && 'My Complaints'}
-              {user.role === 'warden' && 'All Complaints'}
-              {user.role === 'worker' && 'My Tasks'}
-              {user.role === 'admin' && 'All Issues'}
-            </span>
-          </button>
 
-          {user.role !== 'worker' && (
-             <button 
-              onClick={() => { setActiveTab('attendance'); setShowForm(false); }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all text-xs font-bold uppercase tracking-wide ${activeTab === 'attendance' ? (user.role === 'student' ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-white') : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
-            >
-              <Calendar size={18} />
-              <span>Attendance</span>
-            </button>
-          )}
+        <nav className="flex-1 p-4 overflow-y-auto">
+          <p className="px-4 text-[10px] font-extrabold text-slate-600 uppercase tracking-widest mb-3">Main Menu</p>
           
-          {user.role !== 'worker' && (
-            <button 
-              onClick={() => { setActiveTab('announcements'); setShowForm(false); }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all text-xs font-bold uppercase tracking-wide ${activeTab === 'announcements' ? (user.role === 'student' ? 'bg-blue-50 text-blue-700' : 'bg-white/10 text-white') : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
-            >
-              <Bell size={18} />
-              <span>
-                {user.role === 'warden' || user.role === 'admin' ? 'Post Notices' : 'Announcements'}
-              </span>
-            </button>
-          )}
-
-          {user.role === 'admin' && (
-             <button 
-              onClick={() => { setActiveTab('users'); setShowForm(false); }}
-              className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all text-xs font-bold uppercase tracking-wide ${activeTab === 'users' ? 'bg-white/10 text-white' : 'opacity-60 hover:opacity-100 hover:bg-black/5'}`}
-            >
-              <Users size={18} />
-              <span>Users</span>
-            </button>
+          <MenuButton id="dashboard" icon={LayoutDashboard} label="Dashboard" />
+          <MenuButton 
+             id="complaints" 
+             icon={ClipboardList} 
+             label="Complaints" 
+             count={currentUser.role !== 'student' ? complaints.filter(c => c.status !== 'Completed').length : undefined}
+          />
+          <MenuButton id="announcements" icon={Bell} label="Announcements" />
+          <MenuButton id="attendance" icon={Calendar} label="Attendance" />
+          <MenuButton id="leaves" icon={LogOut} label="Leaves & Outing" count={currentUser.role !== 'student' ? leaveRequests.filter(r => r.status === 'Pending').length : undefined} />
+          
+          {(currentUser.role === 'warden' || currentUser.role === 'admin') && (
+             <>
+               <p className="px-4 text-[10px] font-extrabold text-slate-600 uppercase tracking-widest mt-6 mb-3">Admin Tools</p>
+               <MenuButton id="users" icon={Users} label="User Management" count={currentUser.role === 'admin' ? userRequests.length : undefined}/>
+             </>
           )}
         </nav>
 
-        <div className="p-4 border-t border-slate-700/50">
-          <button onClick={handleLogout} className="w-full flex items-center justify-start space-x-3 px-4 py-3 text-xs font-bold uppercase tracking-wide text-red-400 hover:bg-red-900/10 hover:text-red-500 rounded-lg transition-colors">
-            <LogOut size={18} />
-            <span>Sign Out</span>
+        <div className="p-4 border-t border-slate-800">
+          <div className="bg-slate-800 rounded-xl p-3 flex items-center gap-3 mb-3">
+             <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-xs">
+                {currentUser.name.charAt(0)}
+             </div>
+             <div className="flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">{currentUser.name}</p>
+                <p className="text-[10px] text-slate-400 uppercase truncate">{currentUser.role}</p>
+             </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center justify-center gap-2 text-red-400 hover:bg-red-500/10 py-2 rounded-lg transition-colors text-xs font-bold uppercase"
+          >
+            <LogOut size={14} /> Logout
           </button>
         </div>
-      </aside>
+      </div>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col h-screen overflow-hidden relative">
-        
-        {/* Header */}
-        <header className="bg-white border-b border-slate-200 p-4 md:px-8 flex justify-between items-center shadow-sm z-20">
-          <div>
-            <h2 className="text-xl font-extrabold uppercase text-slate-800 tracking-tight">
-              {activeTab === 'dashboard' && 'Overview'}
-              {activeTab === 'complaints' && (user.role === 'worker' ? 'Assigned Jobs' : 'Complaint Board')}
-              {activeTab === 'announcements' && 'Notice Board'}
-              {activeTab === 'attendance' && 'Attendance Register'}
-              {activeTab === 'users' && 'User Registry'}
-            </h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest hidden md:block">
-              {new Date().toDateString()}
-            </p>
-          </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="hidden md:block text-right">
-              <p className="text-xs font-bold uppercase text-slate-800">{user.name}</p>
-              <p className="text-[10px] text-slate-500 font-bold uppercase">{user.role} | {user.roomNumber}</p>
-            </div>
-            <button 
-              onClick={openProfile}
-              className="relative w-10 h-10 rounded-full bg-slate-100 overflow-hidden ring-2 ring-transparent hover:ring-blue-500 transition-all cursor-pointer"
-            >
-              {user.profileImage ? (
-                <img src={user.profileImage} alt="Profile" className="w-full h-full object-cover" />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center bg-slate-800 text-white">
-                  <UserIcon size={18} />
-                </div>
-              )}
-            </button>
-          </div>
+      <div className="flex-1 flex flex-col h-screen overflow-hidden">
+        {/* Top Bar Mobile */}
+        <header className="bg-white border-b border-slate-200 p-4 flex items-center justify-between md:hidden shadow-sm z-40">
+           <div className="flex items-center gap-3">
+              <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="text-slate-600">
+                {isSidebarOpen ? <X size={24} /> : <Menu size={24} />}
+              </button>
+              <span className="font-bold uppercase text-slate-800 text-sm">Krishna Hostel</span>
+           </div>
+           <div className="w-8 h-8 bg-slate-100 rounded-full flex items-center justify-center">
+              <UserIcon size={16} className="text-slate-500"/>
+           </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 scroll-smooth bg-slate-50/50">
-          <div className="max-w-6xl mx-auto">
-            
-            {/* Role Specific Action Buttons */}
-            {activeTab === 'complaints' && !showForm && user.role === 'student' && (
-              <div className="mb-6 flex justify-end">
-                <button 
-                  onClick={() => setShowForm(true)}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl shadow-lg shadow-blue-600/20 flex items-center transition-all text-xs font-bold uppercase tracking-wide transform hover:scale-[1.02] active:scale-95"
-                >
-                  <Plus size={18} className="mr-2" />
-                  File Complaint
-                </button>
-              </div>
-            )}
-
-            {/* Views */}
-            {showForm ? (
-              <ComplaintForm onComplaintAdded={handleNewComplaint} onCancel={() => setShowForm(false)} />
-            ) : (
-              <>
-                {activeTab === 'dashboard' && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <DashboardStats complaints={filteredComplaints} userRole={user.role} />
-                    
-                    {/* Recent List for Dashboard */}
-                    <div className="mt-8">
-                      <h3 className="text-sm font-bold uppercase text-slate-500 mb-4 flex items-center">
-                        <ClipboardList size={16} className="mr-2" /> Recent Activity
-                      </h3>
-                      <ComplaintList 
-                        complaints={filteredComplaints.slice(0, 3)} 
-                        userRole={user.role}
-                        onReviewSubmit={handleReviewSubmit}
-                        onUpdateStatus={handleUpdateStatus}
-                      />
-                    </div>
-                  </div>
-                )}
-
-                {activeTab === 'complaints' && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                     <ComplaintList 
-                      complaints={filteredComplaints} 
-                      userRole={user.role}
-                      onReviewSubmit={handleReviewSubmit}
-                      onUpdateStatus={handleUpdateStatus}
-                      onDelete={user.role === 'admin' ? handleDeleteComplaint : undefined}
-                    />
-                  </div>
-                )}
-
-                {activeTab === 'attendance' && (
-                   <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                      <Attendance userRole={user.role} currentUser={user} />
-                   </div>
-                )}
-
-                {activeTab === 'announcements' && (
-                  <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    <Announcements 
-                      announcements={announcements} 
-                      userRole={user.role}
-                      onReact={handleReaction}
-                      onCreate={handleCreateAnnouncement}
-                      onDelete={(user.role === 'warden' || user.role === 'admin') ? handleDeleteAnnouncement : undefined}
-                    />
-                  </div>
-                )}
-
-                {/* Admin Users View */}
-                {activeTab === 'users' && user.role === 'admin' && (
-                   <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                      <div className="p-6 border-b border-slate-100">
-                        <h3 className="text-sm font-bold uppercase text-slate-800">System Users Directory</h3>
-                      </div>
-                      <div className="p-0">
-                        <table className="w-full text-sm text-left">
-                          <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
-                            <tr>
-                              <th className="px-6 py-4">User Profile</th>
-                              <th className="px-6 py-4">Role</th>
-                              <th className="px-6 py-4">Identifier</th>
-                              <th className="px-6 py-4">Status</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-slate-100">
-                            <tr>
-                              <td className="px-6 py-4 font-bold flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs">AR</div>
-                                Arjun Reddy
-                              </td>
-                              <td className="px-6 py-4"><span className="bg-blue-50 text-blue-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Student</span></td>
-                              <td className="px-6 py-4 font-mono text-xs text-slate-500">STU-2025-001</td>
-                              <td className="px-6 py-4 text-green-600 font-bold uppercase text-xs">Active</td>
-                            </tr>
-                            <tr>
-                              <td className="px-6 py-4 font-bold flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center text-xs">CW</div>
-                                Chief Warden
-                              </td>
-                              <td className="px-6 py-4"><span className="bg-purple-50 text-purple-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Warden</span></td>
-                              <td className="px-6 py-4 font-mono text-xs text-slate-500">WARDEN-01</td>
-                              <td className="px-6 py-4 text-green-600 font-bold uppercase text-xs">Active</td>
-                            </tr>
-                            <tr>
-                              <td className="px-6 py-4 font-bold flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center text-xs">RE</div>
-                                Ramesh Electrician
-                              </td>
-                              <td className="px-6 py-4"><span className="bg-orange-50 text-orange-700 px-2 py-1 rounded text-[10px] font-bold uppercase">Worker</span></td>
-                              <td className="px-6 py-4 font-mono text-xs text-slate-500">WORKER-01</td>
-                              <td className="px-6 py-4 text-slate-400 font-bold uppercase text-xs">Off Duty</td>
-                            </tr>
-                          </tbody>
-                        </table>
-                      </div>
-                   </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
-      </main>
-
-      {/* Profile Modal */}
-      {isProfileOpen && tempUser && (
-        <div className="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in zoom-in-95 duration-200 flex flex-col max-h-[90vh]">
-            <div className={`p-5 flex justify-between items-center text-white shrink-0 ${user.role === 'student' ? 'bg-blue-600' : 'bg-slate-800'}`}>
-              <h3 className="font-bold uppercase text-sm flex items-center gap-2">
-                <UserIcon size={16} />
-                {tempUser.role} Profile
-              </h3>
-              <button onClick={() => setIsProfileOpen(false)} className="hover:bg-white/20 p-1 rounded transition-colors">
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-6 overflow-y-auto custom-scrollbar">
-              {/* Header Info */}
-              <div className="flex flex-col items-center mb-6">
-                <div className="relative group">
-                   <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white shadow-lg">
-                     {tempUser.profileImage ? (
-                       <img src={tempUser.profileImage} alt="Profile" className="w-full h-full object-cover" />
-                     ) : (
-                       <div className="w-full h-full flex items-center justify-center bg-slate-200 text-slate-400">
-                         <UserIcon size={40} />
-                       </div>
-                     )}
-                   </div>
-                   <label className="absolute bottom-0 right-0 bg-slate-800 text-white p-2 rounded-full shadow-lg cursor-pointer hover:bg-black transition-all transform hover:scale-110">
-                     <Camera size={14} />
-                     <input type="file" className="hidden" accept="image/*" onChange={handleProfileImageUpload} />
-                   </label>
-                </div>
-                <h3 className="mt-3 font-bold uppercase text-lg text-slate-800">{tempUser.name}</h3>
-                <p className="text-xs text-slate-500 font-bold uppercase tracking-wide">{tempUser.registerNumber}</p>
-              </div>
-
-              {/* Personal Details - White Inputs */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <main className="flex-1 overflow-y-auto bg-slate-50 p-4 md:p-8">
+           <div className="max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Full Name</label>
-                    <input 
-                      type="text" 
-                      value={tempUser.name} 
-                      onChange={e => setTempUser({...tempUser, name: e.target.value})} 
-                      className="w-full border border-slate-200 rounded p-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" 
-                    />
+                    <h2 className="text-2xl font-extrabold text-slate-800 uppercase tracking-tight">
+                       {activeTab === 'dashboard' && currentUser.role === 'admin' ? 'Admin Control Center' : 
+                        activeTab.replace(/([A-Z])/g, ' $1').trim()}
+                    </h2>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-1">
+                       Welcome back, {currentUser.name}
+                    </p>
                  </div>
-                 <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Date of Birth</label>
-                    <input 
-                      type="date" 
-                      value={tempUser.dob || ''} 
-                      onChange={e => setTempUser({...tempUser, dob: e.target.value})} 
-                      className="w-full border border-slate-200 rounded p-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" 
-                    />
-                 </div>
-                 {tempUser.role === 'student' && (
-                    <div className="md:col-span-2">
-                      <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">Father's Name</label>
-                      <input 
-                        type="text" 
-                        value={tempUser.fatherName || ''} 
-                        onChange={e => setTempUser({...tempUser, fatherName: e.target.value})} 
-                        className="w-full border border-slate-200 rounded p-2.5 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all" 
-                      />
-                    </div>
+                 
+                 {activeTab === 'complaints' && currentUser.role === 'student' && !showComplaintForm && (
+                    <button 
+                      onClick={() => setShowComplaintForm(true)}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg shadow-blue-600/30 hover:bg-blue-700 transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2 font-bold uppercase text-xs tracking-wide"
+                    >
+                      <Plus size={18} /> New Complaint
+                    </button>
                  )}
               </div>
 
-              {/* Contact & Other */}
-              <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 mb-4 space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Blood Group</label>
-                    <div className="text-sm font-bold text-slate-700 flex items-center gap-1">
-                      <Heart size={12} className="text-red-500" /> {tempUser.bloodGroup || 'N/A'}
-                    </div>
-                  </div>
-                  <div>
-                      <label className="block text-[10px] font-bold uppercase text-slate-400 mb-1">Valid Upto</label>
-                      <div className="text-sm font-bold text-slate-700 flex items-center gap-1">
-                        <CreditCard size={12} className="text-blue-500" /> {tempUser.hostelValidUpto || 'N/A'}
-                      </div>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Phone Number</label>
-                  <div className="relative">
-                    <Phone size={14} className="absolute left-3 top-3 text-slate-400" />
-                    <input 
-                      type="text" 
-                      value={tempUser.phoneNumber} 
-                      onChange={(e) => setTempUser({...tempUser, phoneNumber: e.target.value})}
-                      className="w-full bg-white border border-slate-200 rounded-lg pl-9 p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium"
-                    />
-                  </div>
-                </div>
+              {/* Dynamic Content */}
+              <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+                 {renderContent()}
               </div>
-
-              {/* Separate Address Bar */}
-              <div className="mb-6">
-                <label className="block text-[10px] font-bold uppercase text-slate-500 mb-2 flex items-center gap-1">
-                  <MapPin size={12} /> Permanent Address
-                </label>
-                <textarea 
-                  value={tempUser.address || ''} 
-                  onChange={e => setTempUser({...tempUser, address: e.target.value})}
-                  rows={3}
-                  className="w-full border border-slate-200 rounded-lg p-3 text-sm bg-white focus:ring-2 focus:ring-blue-100 outline-none transition-all resize-none"
-                  placeholder="Enter full address here..."
-                />
-              </div>
-
-              {/* Security / Password Section */}
-              <div className="border-t border-slate-100 pt-4">
-                <h4 className="text-xs font-bold uppercase text-slate-400 mb-4 flex items-center">
-                  <Lock size={12} className="mr-1" /> Security Settings
-                </h4>
-                
-                {!isPassVerified ? (
-                  <div className="space-y-3">
-                     <label className="block text-[10px] font-bold uppercase text-slate-500">Current Password</label>
-                     <div className="flex gap-2">
-                       <input 
-                        type="password" 
-                        value={currentPassInput}
-                        onChange={e => setCurrentPassInput(e.target.value)}
-                        className="flex-1 bg-white border border-slate-200 rounded p-2.5 text-sm outline-none focus:border-blue-500"
-                        placeholder="Enter to unlock change"
-                       />
-                       <button 
-                        onClick={verifyPassword}
-                        className="bg-slate-800 text-white px-4 rounded text-xs font-bold uppercase hover:bg-black"
-                       >
-                         Verify
-                       </button>
-                     </div>
-                     {passMsg && <p className="text-xs text-red-500 font-bold flex items-center"><AlertCircle size={12} className="mr-1"/> {passMsg}</p>}
-                  </div>
-                ) : (
-                   <div className="space-y-3 animate-in fade-in slide-in-from-top-2">
-                      <div className="flex items-center gap-2 text-green-600 text-xs font-bold uppercase mb-2">
-                        <CheckCircle2 size={14} /> Password Verified
-                      </div>
-                      <div>
-                        <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">New Password</label>
-                        <div className="relative">
-                          <Key size={14} className="absolute left-3 top-3 text-slate-400" />
-                          <input 
-                            type="password" 
-                            value={newPassInput} 
-                            onChange={(e) => setNewPassInput(e.target.value)}
-                            placeholder="Enter new password"
-                            className="w-full bg-white border border-slate-200 rounded-lg pl-9 p-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium border-blue-300 ring-2 ring-blue-50"
-                          />
-                        </div>
-                      </div>
-                   </div>
-                )}
-              </div>
-
-              <div className="mt-8 flex justify-end gap-3 pt-4 border-t border-slate-100">
-                <button 
-                  onClick={() => setIsProfileOpen(false)}
-                  className="px-4 py-2 text-xs text-slate-500 hover:bg-slate-100 rounded-lg font-bold uppercase transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={saveProfile}
-                  className="px-6 py-2 text-xs bg-slate-900 text-white rounded-lg font-bold uppercase hover:bg-black shadow-lg shadow-slate-900/20"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Mobile Bottom Nav */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-slate-200 flex justify-around p-2 z-40 pb-safe shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <button 
-          onClick={() => { setActiveTab('dashboard'); setShowForm(false); }}
-          className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors ${activeTab === 'dashboard' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
-        >
-          <LayoutDashboard size={20} />
-          <span className="text-[9px] font-bold uppercase mt-1">Home</span>
-        </button>
-        <button 
-          onClick={() => { setActiveTab('complaints'); setShowForm(false); }}
-          className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors ${activeTab === 'complaints' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
-        >
-          <ClipboardList size={20} />
-          <span className="text-[9px] font-bold uppercase mt-1">
-             {user.role === 'worker' ? 'Jobs' : 'Issues'}
-          </span>
-        </button>
-        {user.role !== 'worker' && (
-          <button 
-            onClick={() => { setActiveTab('announcements'); setShowForm(false); }}
-            className={`flex flex-col items-center justify-center w-16 h-14 rounded-lg transition-colors ${activeTab === 'announcements' ? 'text-blue-600 bg-blue-50' : 'text-slate-400'}`}
-          >
-            <Bell size={20} />
-            <span className="text-[9px] font-bold uppercase mt-1">Alerts</span>
-          </button>
-        )}
-        <button 
-          onClick={openProfile}
-          className="flex flex-col items-center justify-center w-16 h-14 rounded-lg text-slate-400 hover:text-slate-600"
-        >
-          <UserIcon size={20} />
-          <span className="text-[9px] font-bold uppercase mt-1">Me</span>
-        </button>
+           </div>
+        </main>
       </div>
 
+      {/* Mobile Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+          onClick={() => setIsSidebarOpen(false)}
+        ></div>
+      )}
     </div>
   );
 };

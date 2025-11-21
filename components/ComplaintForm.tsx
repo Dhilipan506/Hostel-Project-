@@ -25,8 +25,8 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
         return;
       }
       
-      const newFiles = [...imageFiles, ...files];
-      const newPreviews = [...imagePreviews, ...files.map(f => URL.createObjectURL(f))];
+      const newFiles = [...imageFiles, ...(files as File[])];
+      const newPreviews = [...imagePreviews, ...files.map(f => URL.createObjectURL(f as Blob))];
       
       setImageFiles(newFiles);
       setImagePreviews(newPreviews);

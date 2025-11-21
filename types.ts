@@ -10,6 +10,8 @@ export enum ComplaintStatus {
 
 export enum WorkerStatus {
   ASSIGNED = 'Assigned',
+  ACCEPTED = 'Accepted',
+  REJECTED_BY_WORKER = 'Rejected by Worker',
   REACHED = 'Reached Location',
   CHECKING = 'Checking Issue',
   REPAIRING = 'Repairing',
@@ -49,21 +51,36 @@ export interface Complaint {
   urgency: Urgency;
   status: ComplaintStatus;
   workerStatus?: WorkerStatus; 
+  workerAccepted?: boolean; // New field for accept/reject flow
   submittedAt: string;
   estimatedCompletion?: string; 
   startDate?: string; 
-  completionTime?: string; // kept for legacy, but mostly date focused now
+  completionTime?: string; 
   wardenNote?: string;
   assignedWorker?: string;
   rejectionReason?: string;
   
   // Delay & Extension Logic
   isDelayed?: boolean;
-  delayReason?: string; // Reason provided by Student
-  wardenDelayResponse?: string; // Reply from Warden regarding delay
-  extensionReason?: string; // Reason provided by Warden for extending date
-  adminFlagged?: boolean; // If extension reason was invalid
+  delayReason?: string; 
+  wardenDelayResponse?: string; 
+  extensionReason?: string; 
+  adminFlagged?: boolean; 
   
+  // Worker Workflow & Parts
+  proofImages?: {
+    reached?: string;
+    working?: string;
+    completed?: string;
+  };
+  partsNeeded?: boolean;
+  partsDetails?: {
+    description: string;
+    imageUrl?: string;
+    status: 'requested' | 'ordered' | 'received';
+    requestedAt: string;
+  };
+
   review?: {
     rating: number;
     comment: string;
@@ -76,15 +93,41 @@ export interface Announcement {
   content: string;
   date: string;
   author: string;
+  targetAudience: 'all' | 'student' | 'worker';
   reactions: {
     thumbsUp: number;
     thumbsDown: number;
   };
   userReaction?: 'thumbsUp' | 'thumbsDown' | null;
-  feedback?: { userId: string; userName: string; reason: string }[]; // Store negative feedback with user details
+  feedback?: { userId: string; userName: string; reason: string }[]; 
+}
+
+export interface LeaveRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: 'student' | 'worker' | 'warden';
+  fromDate: string;
+  toDate: string;
+  reason: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+  
+  // Student Specific
+  mentorProofUrl?: string;
+  timeOut?: string;
+  timeIn?: string;
+  
+  // Gate Pass Data
+  gatePassGenerated?: boolean;
+  roomNumber?: string;
+  phone?: string;
+  address?: string;
+  fatherName?: string;
 }
 
 export type UserRole = 'student' | 'warden' | 'worker' | 'admin';
+
+export type WorkerAvailability = 'Free' | 'Busy' | 'Unavailable';
 
 export interface User {
   registerNumber: string;
@@ -100,12 +143,27 @@ export interface User {
   dob?: string;
   fatherName?: string;
   hostelValidUpto?: string;
+  
+  // Worker Specific
+  workCategory?: string;
+  currentStatus?: WorkerAvailability;
 }
 
-export interface AttendanceRecord {
+export interface UserRequest {
   id: string;
-  studentId: string;
-  date: string;
-  status: 'Present' | 'Absent' | 'Leave';
-  markedBy: string;
+  requestedBy: string;
+  userType: 'student' | 'worker';
+  name: string;
+  identifier: string; // RegNo or WorkerID
+  status: 'Pending' | 'Approved' | 'Rejected';
+  phoneNumber: string;
+  dob: string;
+
+  // Detailed Fields for creation
+  fatherName?: string;
+  bloodGroup?: string;
+  address?: string;
+  hostelValidUpto?: string;
+  roomNumber?: string;
+  workCategory?: string; // Typing format e.g., "Electrical"
 }

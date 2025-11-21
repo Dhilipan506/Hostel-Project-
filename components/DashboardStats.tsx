@@ -1,8 +1,8 @@
 
 import React from 'react';
-import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, LineChart, Line, AreaChart, Area } from 'recharts';
-import { Complaint, ComplaintStatus, Urgency, UserRole, Category, WorkerStatus } from '../types';
-import { CheckCircle2, Clock, AlertTriangle, Activity, TrendingUp } from 'lucide-react';
+import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, AreaChart, Area } from 'recharts';
+import { Complaint, ComplaintStatus, UserRole } from '../types';
+import { ShieldAlert, BarChart3, Wrench, UserCheck, Users } from 'lucide-react';
 
 interface DashboardStatsProps {
   complaints: Complaint[];
@@ -15,201 +15,134 @@ const COLORS = {
   warning: '#f59e0b',
   danger: '#ef4444',
   purple: '#8b5cf6',
-  slate: '#64748b'
-};
-
-// Speedometer/Gauge Component
-const GaugeChart: React.FC<{ value: number, total: number, color: string, label: string }> = ({ value, total, color, label }) => {
-  const data = [
-    { name: 'Value', value: value },
-    { name: 'Empty', value: total === 0 ? 1 : total - value },
-  ];
-  
-  // Avoid divide by zero visual
-  const displayData = total === 0 ? [{name: 'Empty', value: 1}] : data;
-  const displayColor = total === 0 ? '#e2e8f0' : color;
-
-  return (
-    <div className="flex flex-col items-center justify-center h-full relative">
-      <div className="h-32 w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie
-              data={displayData}
-              cx="50%"
-              cy="70%"
-              startAngle={180}
-              endAngle={0}
-              innerRadius={50}
-              outerRadius={70}
-              paddingAngle={0}
-              dataKey="value"
-              stroke="none"
-            >
-              <Cell fill={displayColor} />
-              <Cell fill="#e2e8f0" />
-            </Pie>
-          </PieChart>
-        </ResponsiveContainer>
-        {/* Value Centered */}
-        <div className="absolute top-[55%] left-0 right-0 text-center">
-          <span className="text-2xl font-extrabold text-slate-800">{value}</span>
-        </div>
-      </div>
-      <span className="text-[10px] font-bold uppercase text-slate-500 mt-[-20px]">{label}</span>
-    </div>
-  );
+  slate: '#64748b',
+  teal: '#14b8a6',
+  orange: '#f97316',
+  indigo: '#6366f1'
 };
 
 const DashboardStats: React.FC<DashboardStatsProps> = ({ complaints, userRole }) => {
   const total = complaints.length;
   const completed = complaints.filter(c => c.status === ComplaintStatus.COMPLETED).length;
   const pending = complaints.filter(c => c.status !== ComplaintStatus.COMPLETED && c.status !== ComplaintStatus.REJECTED).length;
-  const rejected = complaints.filter(c => c.status === ComplaintStatus.REJECTED).length;
-
-  // STUDENT DASHBOARD SPECIFIC
+  
+  // STUDENT DASHBOARD
   if (userRole === 'student') {
-    // Prepare data for line chart (Monthly Work Completed)
-    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-    const monthlyData = new Array(12).fill(0).map((_, i) => ({ name: monthNames[i], completed: 0 }));
-    
-    complaints.forEach(c => {
-      if (c.status === ComplaintStatus.COMPLETED && c.submittedAt) {
-        const d = new Date(c.submittedAt);
-        monthlyData[d.getMonth()].completed += 1;
-      }
-    });
-
-    const currentMonth = new Date().getMonth();
-    const visibleMonthlyData = monthlyData.slice(Math.max(0, currentMonth - 5), currentMonth + 1);
-
     return (
-      <div className="space-y-6 mb-8">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-             <GaugeChart value={total} total={total} color={COLORS.primary} label="Total Raised" />
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-             <GaugeChart value={completed} total={total} color={COLORS.success} label="Resolved" />
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-             <GaugeChart value={pending} total={total} color={COLORS.warning} label="In Progress" />
-          </div>
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
-             <GaugeChart value={rejected} total={total} color={COLORS.danger} label="Rejected" />
-          </div>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+          <h3 className="text-xs font-bold uppercase text-slate-400">Total Complaints</h3>
+          <p className="text-2xl font-extrabold text-slate-800 mt-1">{total}</p>
         </div>
-
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-xs font-bold uppercase text-slate-700 mb-4 flex items-center">
-             <Activity size={16} className="mr-2 text-blue-500" />
-             Monthly Work Completed
-          </h3>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={visibleMonthlyData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="name" tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                <YAxis tick={{fontSize: 10, fill: '#64748b'}} axisLine={false} tickLine={false} />
-                <Tooltip 
-                  contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                  labelStyle={{fontWeight: 'bold', textTransform: 'uppercase', fontSize: '10px', color: '#64748b'}}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="completed" 
-                  stroke={COLORS.success} 
-                  strokeWidth={3} 
-                  dot={{r: 4, strokeWidth: 2, fill: 'white'}} 
-                  activeDot={{r: 6}} 
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 border-b-4 border-green-500">
+          <h3 className="text-xs font-bold uppercase text-slate-400">Resolved</h3>
+          <p className="text-2xl font-extrabold text-green-600 mt-1">{completed}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100 border-b-4 border-orange-500">
+          <h3 className="text-xs font-bold uppercase text-slate-400">In Progress</h3>
+          <p className="text-2xl font-extrabold text-orange-600 mt-1">{pending}</p>
+        </div>
+        <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+           <h3 className="text-xs font-bold uppercase text-slate-400">Avg Resolution</h3>
+           <p className="text-2xl font-extrabold text-blue-600 mt-1">2 Days</p>
         </div>
       </div>
     );
   }
 
-  // WARDEN/ADMIN DASHBOARD
-  if (userRole === 'warden' || userRole === 'admin') {
-    const categoryData = Object.values(Category).map(cat => ({
-      name: cat,
-      value: complaints.filter(c => c.category === cat).length
-    })).filter(d => d.value > 0);
+  // WORKER / WARDEN / ADMIN SHARED DATA
+  // Mock performance data generation based on complaints
+  const workerStats = [
+    { name: 'Ramesh', assigned: 0, completed: 0 },
+    { name: 'Suresh', assigned: 0, completed: 0 },
+    { name: 'Mukesh', assigned: 0, completed: 0 },
+  ];
 
-    const urgencyData = Object.values(Urgency).map(urg => ({
-      name: urg,
-      count: complaints.filter(c => c.urgency === urg && c.status !== ComplaintStatus.COMPLETED).length
-    }));
+  complaints.forEach(c => {
+    if (c.assignedWorker) {
+      const workerName = c.assignedWorker.split(' ')[0];
+      const stat = workerStats.find(s => s.name === workerName);
+      if (stat) {
+        stat.assigned++;
+        if (c.status === ComplaintStatus.COMPLETED) stat.completed++;
+      }
+    }
+  });
 
-    // Mock Data for Area Chart - Complaint Volume Trends
-    const trendData = [
-      { name: 'Mon', volume: 4 },
-      { name: 'Tue', volume: 7 },
-      { name: 'Wed', volume: 3 },
-      { name: 'Thu', volume: 8 },
-      { name: 'Fri', volume: 12 },
-      { name: 'Sat', volume: 6 },
-      { name: 'Sun', volume: 2 },
-    ];
+  // Fallback mock data if empty for visualization
+  const chartData = workerStats.some(s => s.assigned > 0) ? workerStats : [
+    { name: 'Ramesh', assigned: 12, completed: 10 },
+    { name: 'Suresh', assigned: 8, completed: 5 },
+    { name: 'Mukesh', assigned: 15, completed: 15 },
+  ];
 
-    return (
-      <div className="space-y-6 mb-8">
+  return (
+    <div className="space-y-6">
+      {/* ADMIN SPECIFIC - GOD MODE STATS */}
+      {userRole === 'admin' && (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col">
-             <span className="text-xs font-bold uppercase text-slate-400 mb-2">Total Complaints</span>
-             <span className="text-3xl font-extrabold text-slate-800">{total}</span>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col border-l-4 border-orange-400">
-             <span className="text-xs font-bold uppercase text-slate-400 mb-2">Active / Pending</span>
-             <span className="text-3xl font-extrabold text-orange-500">{pending}</span>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col border-l-4 border-green-400">
-             <span className="text-xs font-bold uppercase text-slate-400 mb-2">Resolved</span>
-             <span className="text-3xl font-extrabold text-green-600">{completed}</span>
-          </div>
-          <div className="bg-white p-5 rounded-xl border border-slate-100 shadow-sm flex flex-col border-l-4 border-red-400">
-             <span className="text-xs font-bold uppercase text-slate-400 mb-2">Critical Open</span>
-             <span className="text-3xl font-extrabold text-red-600">
-               {complaints.filter(c => c.urgency === Urgency.CRITICAL && c.status !== ComplaintStatus.COMPLETED).length}
-             </span>
-          </div>
+           <div className="bg-slate-800 text-white p-4 rounded-xl shadow-lg">
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="text-xs font-bold uppercase text-slate-400">Total System Users</h3>
+                <Users size={16} className="text-blue-400"/>
+              </div>
+              <p className="text-3xl font-extrabold">1,240</p>
+              <p className="text-[10px] text-slate-400 mt-1">Students, Workers & Wardens</p>
+           </div>
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <h3 className="text-xs font-bold uppercase text-slate-400">Pending Approvals</h3>
+              <p className="text-3xl font-extrabold text-orange-600">12</p>
+              <p className="text-[10px] text-slate-400 mt-1">Leave & User Requests</p>
+           </div>
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <h3 className="text-xs font-bold uppercase text-slate-400">Active Issues</h3>
+              <p className="text-3xl font-extrabold text-blue-600">{pending}</p>
+           </div>
+           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-100">
+              <h3 className="text-xs font-bold uppercase text-slate-400">System Health</h3>
+              <p className="text-3xl font-extrabold text-green-600">98%</p>
+           </div>
         </div>
+      )}
 
-        {/* Unique Area Chart for Warden */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* WORKER PERFORMANCE GRAPH - VISIBLE TO WARDEN & ADMIN */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-          <h3 className="text-sm font-bold uppercase text-slate-700 mb-4 flex items-center">
-            <TrendingUp size={16} className="mr-2 text-indigo-500" />
-            Weekly Complaint Volume Trend
-          </h3>
-          <div className="h-64">
-             <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={trendData}>
-                  <defs>
-                    <linearGradient id="colorVolume" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false}/>
-                  <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false}/>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none', textTransform: 'uppercase', fontSize: '10px'}} />
-                  <Area type="monotone" dataKey="volume" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorVolume)" />
-                </AreaChart>
-             </ResponsiveContainer>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h3 className="text-sm font-bold uppercase text-slate-800">Worker Performance</h3>
+              <p className="text-xs text-slate-400">Tasks Assigned vs Completed</p>
+            </div>
+            <BarChart3 className="text-blue-500" size={20} />
+          </div>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData} barSize={20}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b', fontWeight: 'bold'}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#64748b'}} />
+                <Tooltip cursor={{fill: '#f8fafc'}} contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} />
+                <Legend iconType="circle" wrapperStyle={{fontSize: '10px', textTransform: 'uppercase', fontWeight: 'bold'}} />
+                <Bar dataKey="assigned" name="Assigned" fill={COLORS.primary} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="completed" name="Completed" fill={COLORS.success} radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold uppercase text-slate-700 mb-4">All Complaints by Category</h3>
-            <div className="h-64">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
+           <h3 className="text-sm font-bold uppercase text-slate-800 mb-6">Issue Categories</h3>
+           <div className="h-64 w-full flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
-                    data={categoryData}
+                    data={[
+                      { name: 'Electrical', value: 35 },
+                      { name: 'Plumbing', value: 25 },
+                      { name: 'Furniture', value: 15 },
+                      { name: 'Cleaning', value: 10 },
+                      { name: 'Other', value: 15 },
+                    ]}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -217,70 +150,19 @@ const DashboardStats: React.FC<DashboardStatsProps> = ({ complaints, userRole })
                     paddingAngle={5}
                     dataKey="value"
                   >
-                    {categoryData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={[COLORS.primary, COLORS.success, COLORS.warning, COLORS.purple, COLORS.danger][index % 5]} />
+                    {Object.values(COLORS).map((color, index) => (
+                      <Cell key={`cell-${index}`} fill={color} strokeWidth={0} />
                     ))}
                   </Pie>
-                  <Tooltip />
-                  <Legend verticalAlign="bottom" iconType="circle" wrapperStyle={{fontSize: '10px', textTransform: 'uppercase'}} />
+                  <Tooltip contentStyle={{borderRadius: '8px', border: 'none'}} />
+                  <Legend layout="vertical" verticalAlign="middle" align="right" iconType="circle" wrapperStyle={{fontSize: '10px', fontWeight: 'bold'}}/>
                 </PieChart>
               </ResponsiveContainer>
-            </div>
-          </div>
-
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-slate-100">
-            <h3 className="text-sm font-bold uppercase text-slate-700 mb-4">Open Issues by Urgency</h3>
-             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={urgencyData}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                  <XAxis dataKey="name" tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                  <YAxis tick={{fontSize: 10}} axisLine={false} tickLine={false} />
-                  <Tooltip cursor={{fill: '#f8fafc'}} />
-                  <Bar dataKey="count" fill={COLORS.primary} radius={[4, 4, 0, 0]} barSize={40} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
+           </div>
         </div>
       </div>
-    );
-  }
-
-  if (userRole === 'worker') {
-    // Worker View (Existing)
-    const myTasks = complaints; 
-    const myPending = myTasks.filter(c => c.status !== ComplaintStatus.COMPLETED).length;
-    const myDone = myTasks.filter(c => c.status === ComplaintStatus.COMPLETED).length;
-
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-blue-500 flex items-center justify-between">
-          <div>
-            <h4 className="text-xs font-bold uppercase text-slate-500 mb-1">Assigned Tasks</h4>
-            <div className="text-4xl font-bold text-slate-800">{myTasks.length}</div>
-          </div>
-          <Activity className="text-blue-100 w-12 h-12" />
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-orange-500 flex items-center justify-between">
-          <div>
-            <h4 className="text-xs font-bold uppercase text-slate-500 mb-1">Pending / Active</h4>
-            <div className="text-4xl font-bold text-slate-800">{myPending}</div>
-          </div>
-          <Clock className="text-orange-100 w-12 h-12" />
-        </div>
-        <div className="bg-white p-6 rounded-xl shadow-sm border-l-4 border-green-500 flex items-center justify-between">
-           <div>
-            <h4 className="text-xs font-bold uppercase text-slate-500 mb-1">Completed</h4>
-            <div className="text-4xl font-bold text-slate-800">{myDone}</div>
-          </div>
-          <CheckCircle2 className="text-green-100 w-12 h-12" />
-        </div>
-      </div>
-    );
-  }
-
-  return null;
+    </div>
+  );
 };
 
 export default DashboardStats;

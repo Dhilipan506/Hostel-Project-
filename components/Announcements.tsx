@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Announcement, UserRole } from '../types';
-import { Megaphone, Plus, Loader2, Send, ThumbsUp, ThumbsDown, AlertTriangle, X, Trash2, MessageCircle } from 'lucide-react';
+import { Megaphone, Plus, Loader2, Send, ThumbsUp, ThumbsDown, AlertTriangle, X, Trash2, MessageCircle, Users, User, Briefcase } from 'lucide-react';
 import { moderateContent } from '../services/geminiService';
 
 interface AnnouncementsProps {
@@ -16,6 +16,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
   const [isCreating, setIsCreating] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newContent, setNewContent] = useState('');
+  const [targetAudience, setTargetAudience] = useState<'all' | 'student' | 'worker'>('all');
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,6 +52,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
         content: moderation.cleanText, 
         date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         author: 'CHIEF WARDEN',
+        targetAudience: targetAudience,
         reactions: { thumbsUp: 0, thumbsDown: 0 },
         userReaction: null,
         feedback: []
@@ -60,6 +62,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
       setIsCreating(false);
       setNewTitle('');
       setNewContent('');
+      setTargetAudience('all');
     } catch (err) {
       setError("Failed to post announcement. Please try again.");
     } finally {
@@ -99,6 +102,13 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
     }
   };
 
+  // Filter Announcements based on Role
+  const filteredAnnouncements = announcements.filter(a => {
+    if (userRole === 'admin' || userRole === 'warden') return true;
+    if (a.targetAudience === 'all') return true;
+    return a.targetAudience === userRole;
+  });
+
   return (
     <div className="space-y-6 relative">
       
@@ -134,7 +144,7 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl animate-in zoom-in-95 max-h-[80vh] overflow-y-auto">
              <div className="flex justify-between items-center mb-4 sticky top-0 bg-white pb-2 border-b border-slate-100">
-               <h3 className="font-bold uppercase text-slate-800 text-sm">Student Feedback</h3>
+               <h3 className="font-bold uppercase text-slate-800 text-sm">Feedback Received</h3>
                <button onClick={() => setViewFeedbackId(null)}><X size={16}/></button>
              </div>
              <div className="space-y-3">
@@ -185,6 +195,24 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
 
                <div className="space-y-4">
                  <div>
+                   <label className="block text-xs font-bold uppercase text-slate-500 mb-2">Target Audience</label>
+                   <div className="flex gap-4">
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200">
+                        <input type="radio" name="audience" value="all" checked={targetAudience === 'all'} onChange={() => setTargetAudience('all')} />
+                        <span className="text-xs font-bold uppercase flex items-center gap-1"><Users size={12}/> Everyone</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200">
+                        <input type="radio" name="audience" value="student" checked={targetAudience === 'student'} onChange={() => setTargetAudience('student')} />
+                        <span className="text-xs font-bold uppercase flex items-center gap-1"><User size={12}/> Students</span>
+                      </label>
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-2 rounded border border-slate-200">
+                        <input type="radio" name="audience" value="worker" checked={targetAudience === 'worker'} onChange={() => setTargetAudience('worker')} />
+                        <span className="text-xs font-bold uppercase flex items-center gap-1"><Briefcase size={12}/> Workers</span>
+                      </label>
+                   </div>
+                 </div>
+
+                 <div>
                    <label className="block text-xs font-bold uppercase text-slate-500 mb-1">Title</label>
                    <input 
                      type="text" 
@@ -221,15 +249,17 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
         </div>
       )}
 
-      {announcements.map((item) => (
+      {filteredAnnouncements.map((item) => (
         <div key={item.id} className="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition-shadow">
           <div className="flex justify-between items-start mb-4 border-b border-slate-50 pb-3">
             <div className="flex items-center gap-3">
-              <div className="bg-blue-50 p-2 rounded-lg text-blue-600">
+              <div className={`p-2 rounded-lg ${item.targetAudience === 'worker' ? 'bg-orange-50 text-orange-600' : 'bg-blue-50 text-blue-600'}`}>
                 <Megaphone size={20} />
               </div>
               <div>
-                <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">{item.author}</span>
+                <span className="block text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {item.author} • For {item.targetAudience}s
+                </span>
                 <span className="text-xs font-bold text-slate-800 uppercase">{item.date}</span>
               </div>
             </div>
@@ -246,50 +276,59 @@ const Announcements: React.FC<AnnouncementsProps> = ({ announcements, userRole, 
           <h3 className="text-lg font-bold uppercase text-slate-900 mb-3">{item.title}</h3>
           <p className="text-slate-600 text-sm mb-6 leading-relaxed">{item.content}</p>
           
-          <div className="flex justify-between items-center border-t border-slate-50 pt-4">
-            <div className="flex gap-2">
-              <button 
-                onClick={() => onReact(item.id, 'thumbsUp')}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
-                  item.userReaction === 'thumbsUp' 
-                    ? 'bg-green-50 border-green-200 text-green-700' 
-                    : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <ThumbsUp size={14} />
-                <span>{item.reactions.thumbsUp}</span>
-              </button>
-              
-              <button 
-                onClick={() => {
-                  if (item.userReaction === 'thumbsDown') {
-                     onReact(item.id, 'thumbsDown');
-                  } else {
-                    handleThumbsDownClick(item.id);
-                  }
-                }}
-                className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
-                  item.userReaction === 'thumbsDown' 
-                    ? 'bg-slate-200 border-slate-300 text-slate-700' 
-                    : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
-                }`}
-              >
-                <ThumbsDown size={14} />
-                <span>{item.reactions.thumbsDown}</span>
-              </button>
-            </div>
+          {/* Reactions - Hidden for Workers */}
+          {userRole !== 'worker' && (
+            <div className="flex justify-between items-center border-t border-slate-50 pt-4">
+              <div className="flex gap-2">
+                <button 
+                  onClick={() => onReact(item.id, 'thumbsUp')}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
+                    item.userReaction === 'thumbsUp' 
+                      ? 'bg-green-50 border-green-200 text-green-700' 
+                      : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <ThumbsUp size={14} />
+                  <span>{item.reactions.thumbsUp}</span>
+                </button>
+                
+                <button 
+                  onClick={() => {
+                    if (item.userReaction === 'thumbsDown') {
+                      onReact(item.id, 'thumbsDown');
+                    } else {
+                      handleThumbsDownClick(item.id);
+                    }
+                  }}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-bold transition-all border ${
+                    item.userReaction === 'thumbsDown' 
+                      ? 'bg-slate-200 border-slate-300 text-slate-700' 
+                      : 'bg-white border-slate-100 text-slate-500 hover:bg-slate-50'
+                  }`}
+                >
+                  <ThumbsDown size={14} />
+                  <span>{item.reactions.thumbsDown}</span>
+                </button>
+              </div>
 
-            {(userRole === 'warden' || userRole === 'admin') && item.feedback && item.feedback.length > 0 && (
-               <button 
-                onClick={() => setViewFeedbackId(item.id)}
-                className="text-xs font-bold uppercase text-blue-600 hover:underline flex items-center gap-1"
-               >
-                 <MessageCircle size={14}/> View Feedback
-               </button>
-            )}
-          </div>
+              {(userRole === 'warden' || userRole === 'admin') && item.feedback && item.feedback.length > 0 && (
+                <button 
+                  onClick={() => setViewFeedbackId(item.id)}
+                  className="text-xs font-bold uppercase text-blue-600 hover:underline flex items-center gap-1"
+                >
+                  <MessageCircle size={14}/> View Feedback
+                </button>
+              )}
+            </div>
+          )}
         </div>
       ))}
+      
+      {filteredAnnouncements.length === 0 && (
+         <div className="text-center py-10">
+           <p className="text-slate-400 text-sm font-bold uppercase">No announcements for you.</p>
+         </div>
+      )}
     </div>
   );
 };

@@ -203,3 +203,46 @@ export const validateExtensionReason = async (reason: string): Promise<{ isValid
     return { isValid: true, flagForAdmin: false }; // Fallback
   }
 };
+
+export const validateWorkerEvidence = async (imageFile: File, stage: 'reached' | 'working' | 'completed', issueContext: string): Promise<{ isValid: boolean; reason?: string }> => {
+  const modelId = "gemini-2.5-flash";
+  const imagePart = await fileToGenerativePart(imageFile);
+  
+  const prompt = `
+    You are verifying proof of work for a hostel maintenance task.
+    Original Issue: "${issueContext}"
+    Stage of Work: "${stage}" (reached = just arrived outside room, working = tools visible/mid-repair, completed = fixed).
+
+    Task:
+    Analyze the image.
+    1. If stage is 'reached': Does it look like a door number, hallway, or hostel room entrance?
+    2. If stage is 'working': Are there tools, open machinery, or work in progress related to the issue?
+    3. If stage is 'completed': Does it show the object in a fixed/clean state?
+    
+    Return JSON:
+    {
+      "isValid": boolean,
+      "reason": "Short explanation if invalid"
+    }
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: { parts: [{ text: prompt }, imagePart] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isValid: { type: Type.BOOLEAN },
+            reason: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"isValid": true}');
+  } catch (e) {
+    return { isValid: true }; // Fail open if AI down
+  }
+};

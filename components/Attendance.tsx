@@ -1,18 +1,25 @@
 
 import React, { useState } from 'react';
 import { UserRole, User } from '../types';
-import { Calendar, CheckCircle2, XCircle, Save, Droplets, Clock } from 'lucide-react';
+import { Calendar, CheckCircle2, XCircle, Save, Droplets, Clock, Users, Briefcase } from 'lucide-react';
 
 interface AttendanceProps {
   userRole: UserRole;
   currentUser: User;
 }
 
-// Mock Students Structure
+// Mock Data Interfaces
 interface MockStudent {
   id: string;
   name: string;
   room: string;
+  status: 'Present' | 'Absent' | null;
+}
+
+interface MockWorker {
+  id: string;
+  name: string;
+  role: string;
   status: 'Present' | 'Absent' | null;
 }
 
@@ -21,11 +28,12 @@ const ROOMS = ['Room 101', 'Room 102', 'Room 103', 'Dormitory 1'];
 
 const Attendance: React.FC<AttendanceProps> = ({ userRole, currentUser }) => {
   // Warden State
+  const [activeTab, setActiveTab] = useState<'students' | 'workers'>('students');
   const [selectedFloor, setSelectedFloor] = useState(FLOORS[0]);
   const [selectedRoom, setSelectedRoom] = useState(ROOMS[0]);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
   
-  // Updated Mock Data
+  // Mock Student Data
   const [students, setStudents] = useState<MockStudent[]>([
     // Room 101 - 12 Students
     { id: 'REG-23-001', name: 'A. Reddy', room: '101', status: 'Present' },
@@ -53,6 +61,15 @@ const Attendance: React.FC<AttendanceProps> = ({ userRole, currentUser }) => {
     { id: 'REG-23-019', name: 'S. Thakur', room: '103', status: null },
   ]);
 
+  // Mock Worker Data
+  const [workers, setWorkers] = useState<MockWorker[]>([
+    { id: 'WRK-001', name: 'Ramesh Kumar', role: 'Electrician', status: 'Present' },
+    { id: 'WRK-002', name: 'Suresh Singh', role: 'Plumber', status: null },
+    { id: 'WRK-003', name: 'Mukesh Gupta', role: 'Housekeeping', status: 'Present' },
+    { id: 'WRK-004', name: 'Raj Malhotra', role: 'Network Eng', status: 'Absent' },
+    { id: 'WRK-005', name: 'Ganesh Acharya', role: 'Carpenter', status: null },
+  ]);
+
   // Student State - History with Time
   const attendanceHistory = [
     { date: '2023-10-25', time: '09:00 AM', status: 'Present' },
@@ -62,8 +79,12 @@ const Attendance: React.FC<AttendanceProps> = ({ userRole, currentUser }) => {
     { date: '2023-10-21', time: '09:05 AM', status: 'Present' },
   ];
 
-  const handleMark = (id: string, status: 'Present' | 'Absent') => {
+  const handleMarkStudent = (id: string, status: 'Present' | 'Absent') => {
     setStudents(students.map(s => s.id === id ? { ...s, status } : s));
+  };
+
+  const handleMarkWorker = (id: string, status: 'Present' | 'Absent') => {
+    setWorkers(workers.map(w => w.id === id ? { ...w, status } : w));
   };
 
   const handleSave = () => {
@@ -130,88 +151,168 @@ const Attendance: React.FC<AttendanceProps> = ({ userRole, currentUser }) => {
          </div>
       )}
 
-      <div className="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h2 className="text-lg font-bold uppercase text-slate-800">Attendance</h2>
-        <button 
-          onClick={handleSave}
-          className="bg-slate-900 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase flex items-center hover:bg-black shadow-lg shadow-slate-900/20 transition-all active:scale-95"
-        >
-          <Save size={14} className="mr-2" /> Save
-        </button>
+      <div className="p-6 pb-0 flex flex-col gap-4">
+        <div className="flex justify-between items-center">
+          <h2 className="text-lg font-bold uppercase text-slate-800">Attendance Registry</h2>
+          <button 
+            onClick={handleSave}
+            className="bg-slate-900 text-white px-6 py-2 rounded-lg text-xs font-bold uppercase flex items-center hover:bg-black shadow-lg shadow-slate-900/20 transition-all active:scale-95"
+          >
+            <Save size={14} className="mr-2" /> Save Changes
+          </button>
+        </div>
+
+        {/* Tabs */}
+        <div className="flex gap-6 border-b border-slate-100 mt-2">
+          <button 
+            onClick={() => setActiveTab('students')}
+            className={`pb-3 text-xs font-bold uppercase flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'students' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Users size={14} /> Students
+          </button>
+          <button 
+            onClick={() => setActiveTab('workers')}
+            className={`pb-3 text-xs font-bold uppercase flex items-center gap-2 border-b-2 transition-colors ${
+              activeTab === 'workers' ? 'border-blue-600 text-blue-600' : 'border-transparent text-slate-400 hover:text-slate-600'
+            }`}
+          >
+            <Briefcase size={14} /> Staff / Workers
+          </button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="p-4 bg-slate-50 flex gap-4 border-b border-slate-100">
-        <select 
-          value={selectedFloor} 
-          onChange={e => setSelectedFloor(e.target.value)}
-          className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold uppercase outline-none shadow-sm w-32"
-        >
-          {FLOORS.map(f => <option key={f} value={f}>{f}</option>)}
-        </select>
-        <select 
-          value={selectedRoom} 
-          onChange={e => setSelectedRoom(e.target.value)}
-          className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold uppercase outline-none shadow-sm w-32"
-        >
-          {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-      </div>
+      {/* Filters (Only for Students) */}
+      {activeTab === 'students' && (
+        <div className="p-4 bg-slate-50 flex gap-4 border-y border-slate-100">
+          <select 
+            value={selectedFloor} 
+            onChange={e => setSelectedFloor(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold uppercase outline-none shadow-sm w-32"
+          >
+            {FLOORS.map(f => <option key={f} value={f}>{f}</option>)}
+          </select>
+          <select 
+            value={selectedRoom} 
+            onChange={e => setSelectedRoom(e.target.value)}
+            className="bg-white border border-slate-200 rounded-lg p-2 text-xs font-bold uppercase outline-none shadow-sm w-32"
+          >
+            {ROOMS.map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </div>
+      )}
 
-      {/* Three Column List: Register No | Room No | Attendance */}
+      {/* Table Content */}
       <div className="p-0">
         <table className="w-full text-left">
           <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-wider">
             <tr>
-              <th className="px-6 py-4 w-1/3">Register Number</th>
-              <th className="px-6 py-4 w-1/3">Room No</th>
+              {activeTab === 'students' ? (
+                <>
+                  <th className="px-6 py-4 w-1/3">Register Number</th>
+                  <th className="px-6 py-4 w-1/3">Room No</th>
+                </>
+              ) : (
+                <>
+                  <th className="px-6 py-4 w-1/3">Worker ID</th>
+                  <th className="px-6 py-4 w-1/3">Role / Department</th>
+                </>
+              )}
               <th className="px-6 py-4 w-1/3 text-center">Attendance</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {displayedStudents.map((student) => (
-              <tr key={student.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-6 py-4">
-                  <div className="text-xs font-bold text-slate-800 font-mono">{student.id}</div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold uppercase">
-                    {student.room}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex justify-center gap-4">
-                    <button 
-                      onClick={() => handleMark(student.id, 'Present')}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
-                        student.status === 'Present' 
-                        ? 'bg-green-600 text-white shadow-md scale-110' 
-                        : 'bg-slate-100 text-slate-300 hover:bg-green-100 hover:text-green-600'
-                      }`}
-                      title="Present"
-                    >
-                      <CheckCircle2 size={18} />
-                    </button>
-                    <button 
-                      onClick={() => handleMark(student.id, 'Absent')}
-                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
-                        student.status === 'Absent' 
-                        ? 'bg-red-600 text-white shadow-md scale-110' 
-                        : 'bg-slate-100 text-slate-300 hover:bg-red-100 hover:text-red-600'
-                      }`}
-                      title="Absent"
-                    >
-                      <XCircle size={18} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {activeTab === 'students' ? (
+              displayedStudents.length > 0 ? (
+                displayedStudents.map((student) => (
+                  <tr key={student.id} className="hover:bg-slate-50 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="text-xs font-bold text-slate-800 font-mono">{student.id}</div>
+                      <div className="text-[10px] font-semibold text-slate-400 uppercase">{student.name}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="px-3 py-1 bg-blue-50 text-blue-700 rounded-md text-[10px] font-bold uppercase">
+                        {student.room}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex justify-center gap-4">
+                        <button 
+                          onClick={() => handleMarkStudent(student.id, 'Present')}
+                          className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
+                            student.status === 'Present' 
+                            ? 'bg-green-600 text-white shadow-md scale-110' 
+                            : 'bg-slate-100 text-slate-300 hover:bg-green-100 hover:text-green-600'
+                          }`}
+                          title="Present"
+                        >
+                          <CheckCircle2 size={18} />
+                        </button>
+                        <button 
+                          onClick={() => handleMarkStudent(student.id, 'Absent')}
+                          className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
+                            student.status === 'Absent' 
+                            ? 'bg-red-600 text-white shadow-md scale-110' 
+                            : 'bg-slate-100 text-slate-300 hover:bg-red-100 hover:text-red-600'
+                          }`}
+                          title="Absent"
+                        >
+                          <XCircle size={18} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={3} className="p-8 text-center text-slate-400 text-xs font-bold uppercase">No students found in this room.</td>
+                </tr>
+              )
+            ) : (
+              // Workers List
+              workers.map((worker) => (
+                <tr key={worker.id} className="hover:bg-slate-50 transition-colors">
+                  <td className="px-6 py-4">
+                    <div className="text-xs font-bold text-slate-800 font-mono">{worker.id}</div>
+                    <div className="text-[10px] font-semibold text-slate-400 uppercase">{worker.name}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="px-3 py-1 bg-orange-50 text-orange-700 rounded-md text-[10px] font-bold uppercase">
+                      {worker.role}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex justify-center gap-4">
+                      <button 
+                        onClick={() => handleMarkWorker(worker.id, 'Present')}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
+                          worker.status === 'Present' 
+                          ? 'bg-green-600 text-white shadow-md scale-110' 
+                          : 'bg-slate-100 text-slate-300 hover:bg-green-100 hover:text-green-600'
+                        }`}
+                        title="Present"
+                      >
+                        <CheckCircle2 size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleMarkWorker(worker.id, 'Absent')}
+                        className={`w-8 h-8 flex items-center justify-center rounded-full transition-all transform active:scale-95 ${
+                          worker.status === 'Absent' 
+                          ? 'bg-red-600 text-white shadow-md scale-110' 
+                          : 'bg-slate-100 text-slate-300 hover:bg-red-100 hover:text-red-600'
+                        }`}
+                        title="Absent"
+                      >
+                        <XCircle size={18} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
-        {displayedStudents.length === 0 && (
-           <div className="p-8 text-center text-slate-400 text-xs font-bold uppercase">No students found.</div>
-        )}
       </div>
     </div>
   );
