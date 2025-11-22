@@ -37,23 +37,18 @@ export const analyzeComplaint = async (text: string, imageFiles: File[], userCat
   const modelId = "gemini-2.5-flash";
 
   const prompt = `
-    You are a hostel facility management AI assistant. Analyze this student complaint description and the attached images.
-    
-    Context:
-    The student has manually selected the category: "${userCategory || 'Unknown'}". 
+    You are a facility management system. Analyze this complaint and the images.
     
     Tasks:
-    1. Check for abusive, spam, or non-English content. If it violates these, set isSafe to false.
-    2. VISUAL VALIDATION (STRICT): Compare the user's text description with the content of the images. 
-       - The image MUST be relevant evidence of the problem described.
-       - If the text says "AC not working" but the image is of a bed or a bathroom, set matchesDescription to FALSE.
-       - If the text says "Tap leaking" but the image shows a fan, set matchesDescription to FALSE.
-       - If the image is completely black, blurry beyond recognition, or irrelevant (e.g., a selfie), set matchesDescription to FALSE.
-       - Only set matchesDescription to TRUE if the image plausibly shows the object or area mentioned in the text.
-    3. Rewrite the description into clear, simple, professional English.
-    4. Create a short 3-5 word title.
-    5. Categorize the issue into exactly one of these: AC, Electrical, Furniture, Cleaning, Wifi, Plumbing, Water Supply, Other.
-    6. Determine urgency (Low, Medium, High, Critical) based on safety risks and habitability.
+    1. Check for safety (abusive content).
+    2. AUTHENTICITY CHECK: Analyze the image style.
+       - Does it look like a screenshot from Google Images?
+       - Does it look like a cartoon, drawing, or AI-generated image?
+       - Does it look like a perfect stock photo with watermarks?
+       - If YES to any of above, set matchesDescription to FALSE and reason "Image appears to be downloaded from internet or synthetic. Please upload a real camera photo."
+    3. VISUAL VALIDATION: Does the image content match the text "${text}"?
+    4. Rewrite description professionally.
+    5. Categorize and set Urgency.
   `;
 
   try {
@@ -65,7 +60,6 @@ export const analyzeComplaint = async (text: string, imageFiles: File[], userCat
       contents: {
         parts: [
           { text: prompt },
-          { text: `Description: ${text}` },
           ...imageParts
         ]
       },
@@ -75,10 +69,10 @@ export const analyzeComplaint = async (text: string, imageFiles: File[], userCat
           type: Type.OBJECT,
           properties: {
             isSafe: { type: Type.BOOLEAN },
-            matchesDescription: { type: Type.BOOLEAN, description: "Does the image evidence strictly match the text description?" },
-            rejectionReason: { type: Type.STRING, description: "Why it was marked unsafe or mismatch (optional)" },
-            cleanDescription: { type: Type.STRING, description: "Rewritten professional description" },
-            title: { type: Type.STRING, description: "Short title" },
+            matchesDescription: { type: Type.BOOLEAN },
+            rejectionReason: { type: Type.STRING },
+            cleanDescription: { type: Type.STRING },
+            title: { type: Type.STRING },
             category: { 
               type: Type.STRING, 
               enum: ["AC", "Electrical", "Furniture", "Cleaning", "Wifi", "Plumbing", "Water Supply", "Other"] 
@@ -94,7 +88,7 @@ export const analyzeComplaint = async (text: string, imageFiles: File[], userCat
     });
 
     const resultText = response.text;
-    if (!resultText) throw new Error("No response from AI");
+    if (!resultText) throw new Error("System busy");
     
     const data = JSON.parse(resultText);
     
@@ -109,7 +103,7 @@ export const analyzeComplaint = async (text: string, imageFiles: File[], userCat
     };
 
   } catch (error) {
-    console.error("Gemini Analysis Error:", error);
+    console.error("Analysis Error:", error);
     throw error;
   }
 };
@@ -118,23 +112,8 @@ export const moderateContent = async (text: string): Promise<{ approved: boolean
   const modelId = "gemini-2.5-flash";
   
   const prompt = `
-    You are a content moderator for a university hostel system.
-    Task: Review the following text (complaint review or announcement).
-    
-    Criteria for Rejection (approved: false):
-    1. Profanity, abusive language, or toxicity.
-    2. Grammatically broken English that is impossible to understand.
-    3. Non-English content.
-    4. "Improper words" or slang that is unprofessional.
-    
-    Criteria for Approval (approved: true):
-    1. Proper, understandable English.
-    2. Professional or neutral tone.
-    3. Constructive criticism is allowed, but insults are not.
-
-    Output:
-    - If approved, return the text (you may fix minor grammar issues in cleanText).
-    - If rejected, provide a reason.
+    Moderation Task. Review text for profanity or toxicity.
+    Rewrite professionally if needed.
   `;
 
   try {
@@ -162,25 +141,16 @@ export const moderateContent = async (text: string): Promise<{ approved: boolean
     return JSON.parse(resultText);
 
   } catch (error) {
-    console.error("Moderation Error", error);
-    return { approved: false, cleanText: text, reason: "AI Validation Service Unavailable." }; 
+    return { approved: false, cleanText: text, reason: "System Unavailable." }; 
   }
 };
 
 export const validateExtensionReason = async (reason: string): Promise<{ isValid: boolean; flagForAdmin: boolean }> => {
   const modelId = "gemini-2.5-flash";
   const prompt = `
-    You are a supervisor monitoring hostel maintenance staff.
-    A warden is asking to extend a deadline for a student complaint.
-    Analyze their reason: "${reason}".
-
-    Rules:
-    1. Valid Reasons: Waiting for parts, unexpected complexity, worker unavailable (sick), access issue.
-    2. Invalid Reasons: Forgot, lazy, no reason given, "idk", nonsense text.
-
-    Output:
-    - isValid: true if the reason is professional and acceptable.
-    - flagForAdmin: true if the reason is suspicious, unprofessional, or invalid.
+    Analyze warden reason for delay: "${reason}".
+    Valid: Parts pending, Sick, Access issue.
+    Invalid: Forgot, Lazy, No reason.
   `;
 
   try {
@@ -200,7 +170,7 @@ export const validateExtensionReason = async (reason: string): Promise<{ isValid
     });
     return JSON.parse(response.text || '{"isValid": false, "flagForAdmin": true}');
   } catch (e) {
-    return { isValid: true, flagForAdmin: false }; // Fallback
+    return { isValid: true, flagForAdmin: false }; 
   }
 };
 
@@ -209,21 +179,13 @@ export const validateWorkerEvidence = async (imageFile: File, stage: 'reached' |
   const imagePart = await fileToGenerativePart(imageFile);
   
   const prompt = `
-    You are verifying proof of work for a hostel maintenance task.
-    Original Issue: "${issueContext}"
-    Stage of Work: "${stage}" (reached = just arrived outside room, working = tools visible/mid-repair, completed = fixed).
-
-    Task:
-    Analyze the image.
-    1. If stage is 'reached': Does it look like a door number, hallway, or hostel room entrance?
-    2. If stage is 'working': Are there tools, open machinery, or work in progress related to the issue?
-    3. If stage is 'completed': Does it show the object in a fixed/clean state?
+    Verify proof of work image.
+    Issue: "${issueContext}"
+    Stage: "${stage}"
     
-    Return JSON:
-    {
-      "isValid": boolean,
-      "reason": "Short explanation if invalid"
-    }
+    Check:
+    1. Is it a real photo (not internet/AI)?
+    2. Does it match the stage (Tools for working, Clean for completed)?
   `;
 
   try {
@@ -243,6 +205,37 @@ export const validateWorkerEvidence = async (imageFile: File, stage: 'reached' |
     });
     return JSON.parse(response.text || '{"isValid": true}');
   } catch (e) {
-    return { isValid: true }; // Fail open if AI down
+    return { isValid: true };
+  }
+};
+
+export const validateDocumentDetails = async (imageFile: File, studentName: string, regNo: string): Promise<{ isValid: boolean; reason?: string }> => {
+  const modelId = "gemini-2.5-flash";
+  const imagePart = await fileToGenerativePart(imageFile);
+
+  const prompt = `
+    Verify Mentor Approval Document.
+    Check for Name: "${studentName}" OR ID: "${regNo}".
+    Also ensure it looks like a real document photo, not generated.
+  `;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: modelId,
+      contents: { parts: [{ text: prompt }, imagePart] },
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isValid: { type: Type.BOOLEAN },
+            reason: { type: Type.STRING }
+          }
+        }
+      }
+    });
+    return JSON.parse(response.text || '{"isValid": true}');
+  } catch (e) {
+    return { isValid: true, reason: "System check unavailable, proceeding." };
   }
 };

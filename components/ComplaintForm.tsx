@@ -2,14 +2,15 @@
 import React, { useState } from 'react';
 import { Loader2, Upload, AlertTriangle, CheckCircle, HelpCircle, X } from 'lucide-react';
 import { analyzeComplaint, fileToGenerativePart } from '../services/geminiService';
-import { Complaint, ComplaintStatus, Category } from '../types';
+import { Complaint, ComplaintStatus, Category, User } from '../types';
 
 interface ComplaintFormProps {
   onComplaintAdded: (complaint: Complaint) => void;
   onCancel: () => void;
+  currentUser: User;
 }
 
-const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCancel }) => {
+const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCancel, currentUser }) => {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category | ''>('');
   const [imageFiles, setImageFiles] = useState<File[]>([]);
@@ -63,18 +64,17 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
     setError(null);
 
     try {
-      // Call Gemini with user category hint and MULTIPLE images
+      // System validation
       const analysis = await analyzeComplaint(description, imageFiles, category);
 
       if (!analysis.isSafe) {
-        setError(`Submission rejected: ${analysis.rejectionReason || 'Content violation detected.'}`);
+        setError(`Submission rejected: ${analysis.rejectionReason || 'Content violation.'}`);
         setIsSubmitting(false);
         return;
       }
 
-      // Validating if image matches description
       if (!analysis.matchesDescription) {
-        setError("Evidence Mismatch: The uploaded image does not match your description. You must upload valid proof of the specific problem.");
+        setError("Evidence Mismatch: The uploaded image does not match the issue description or appears to be downloaded from the internet.");
         setIsSubmitting(false);
         return;
       }
@@ -87,8 +87,10 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
 
       // Construct Complaint Object
       const newComplaint: Complaint = {
-        id: 'TEMP', // Placeholder, will be overwritten by parent with ID logic
-        studentId: 'PENDING',
+        id: crypto.randomUUID(),
+        studentId: currentUser.registerNumber,
+        studentName: currentUser.name,
+        studentRoom: currentUser.roomNumber,
         title: analysis.title,
         description: description,
         cleanDescription: analysis.cleanDescription,
@@ -103,24 +105,24 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
       onComplaintAdded(newComplaint);
     } catch (err) {
       console.error(err);
-      setError("Failed to process complaint. Please try again.");
+      setError("Failed to process. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-md overflow-hidden">
-      <div className="p-6 border-b border-slate-100 bg-blue-50 flex justify-between items-center">
-        <h2 className="text-lg font-bold uppercase text-blue-900">File New Complaint</h2>
+    <div className="bg-white rounded-xl shadow-md overflow-hidden border border-slate-100">
+      <div className="p-6 border-b border-slate-100 bg-white flex justify-between items-center">
+        <h2 className="text-lg font-bold uppercase text-blue-800">File New Complaint</h2>
         <button onClick={onCancel} className="text-slate-500 hover:text-slate-700 uppercase text-xs font-bold">Cancel</button>
       </div>
       
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         {error && (
-          <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-start">
+          <div className="bg-red-50 text-red-600 p-4 rounded-lg flex items-start border border-red-100">
             <AlertTriangle size={20} className="mr-2 mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
+            <span className="text-sm font-bold">{error}</span>
           </div>
         )}
 
@@ -132,7 +134,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
              <select
               value={category}
               onChange={(e) => setCategory(e.target.value as Category)}
-              className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none bg-white text-sm font-bold"
+              className="w-full border border-slate-300 bg-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none appearance-none text-sm font-bold text-slate-800"
             >
               <option value="" disabled>Select a category...</option>
               <option value={Category.AC}>AC</option>
@@ -155,12 +157,12 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             rows={4}
-            className="w-full border border-slate-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none text-sm bg-white"
+            className="w-full border border-slate-300 bg-white rounded-lg p-3 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all resize-none text-sm text-slate-800"
             placeholder="Describe the problem clearly..."
           />
           <div className="flex items-center gap-2 mt-2 text-xs text-blue-600 bg-blue-50 p-2 rounded">
             <HelpCircle size={14} />
-            <p>AI will strictly verify if your description matches the attached photo.</p>
+            <p>System will check if your description matches the attached photo.</p>
           </div>
         </div>
 
@@ -183,7 +185,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
             ))}
             
             {imageFiles.length < 3 && (
-              <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-slate-50 hover:bg-slate-100 transition-colors">
+              <label className="flex flex-col items-center justify-center w-24 h-24 border-2 border-slate-300 border-dashed rounded-lg cursor-pointer bg-white hover:bg-slate-50 transition-colors">
                 <div className="flex flex-col items-center justify-center">
                    <Upload className="w-6 h-6 text-slate-400 mb-1" />
                    <span className="text-[10px] font-bold uppercase text-slate-500">Add Photo</span>
@@ -203,7 +205,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({ onComplaintAdded, onCance
             {isSubmitting ? (
               <>
                 <Loader2 className="animate-spin mr-2" size={16} />
-                Validating Proof...
+                Validating...
               </>
             ) : (
               <>

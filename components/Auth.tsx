@@ -1,19 +1,28 @@
 
 import React, { useState } from 'react';
 import { User } from '../types';
-import { User as UserIcon, Lock, Shield, PenTool, BookOpen } from 'lucide-react';
+import { User as UserIcon, Lock, Shield, Ban, Home } from 'lucide-react';
 
 interface AuthProps {
   onLogin: (user: User) => void;
+  blockedUsers: string[]; // IDs of blocked users
 }
 
-const Auth: React.FC<AuthProps> = ({ onLogin }) => {
+const Auth: React.FC<AuthProps> = ({ onLogin, blockedUsers }) => {
   const [regNo, setRegNo] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
+    
+    if (blockedUsers.includes(regNo)) {
+       setError("Your account has been temporarily blocked due to disciplinary action. Contact Admin.");
+       return;
+    }
+
     if (regNo && password) {
       setIsLoading(true);
       
@@ -24,6 +33,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         let userName = 'Hostel Resident';
         let roomId = 'A-101';
         let registerNumber = regNo;
+        let workCat = '';
 
         // Role Detection Logic (Mock)
         if (lowerReg === 'warden' && password === 'admin') {
@@ -36,17 +46,22 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           userName = 'Ramesh (Electrician)'; 
           roomId = 'MAINTENANCE';
           registerNumber = 'WORKER-01';
+          workCat = 'Electrical';
         } else if (lowerReg === 'admin' && password === 'root') {
           userRole = 'admin';
           userName = 'SYSTEM ADMINISTRATOR';
           roomId = 'SERVER ROOM';
           registerNumber = 'ADMIN';
-        } else {
-          // Default Student - ensure 9 digits if numeric, else generic
+        } else if (password === '1234') {
+          // Default Student
           userRole = 'student';
           userName = 'Arjun Reddy';
           roomId = '302-A';
-          registerNumber = '123456789'; // 9 Digit Format
+          registerNumber = regNo; 
+        } else {
+            setError("Invalid Credentials");
+            setIsLoading(false);
+            return;
         }
 
         onLogin({
@@ -62,6 +77,8 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
           dob: '2000-01-01',
           fatherName: userRole === 'student' ? 'Rajesh Reddy' : undefined,
           hostelValidUpto: '2025-12-31',
+          workCategory: workCat,
+          currentStatus: 'Free',
           password: password 
         });
         setIsLoading(false);
@@ -82,8 +99,11 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
         <div className="bg-white/95 backdrop-blur-md shadow-2xl rounded-2xl p-8 w-full border border-slate-200">
           
           <div className="flex flex-col items-center mb-8">
-            <div className="bg-blue-600 p-3 rounded-full mb-4 shadow-lg shadow-blue-600/30">
+            <div className="bg-blue-600 p-3 rounded-full mb-4 shadow-lg shadow-blue-600/30 relative">
               <Shield className="text-white w-8 h-8" />
+              <div className="absolute inset-0 flex items-center justify-center">
+                  <Home className="text-blue-600 w-4 h-4 mt-1" fill="currentColor"/>
+              </div>
             </div>
             <h1 className="text-2xl font-extrabold text-slate-900 tracking-wider uppercase text-center">Krishna Hostel</h1>
             <p className="mt-2 text-xs font-bold uppercase text-slate-500 tracking-widest">SIMATS Management Portal</p>
@@ -91,6 +111,12 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             
+            {error && (
+              <div className="bg-red-100 text-red-700 p-3 rounded text-xs font-bold flex items-center gap-2">
+                 <Ban size={14}/> {error}
+              </div>
+            )}
+
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <UserIcon size={18} className="text-slate-400 group-focus-within:text-blue-600 transition-colors" />
@@ -98,7 +124,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <input
                 type="text"
                 required
-                className="w-full bg-slate-50 text-slate-900 px-10 py-3.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder-slate-400 font-bold text-sm"
+                className="w-full bg-white text-slate-900 px-10 py-3.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder-slate-400 font-bold text-sm"
                 placeholder="Username / ID"
                 value={regNo}
                 onChange={(e) => setRegNo(e.target.value)}
@@ -112,7 +138,7 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
               <input
                 type="password"
                 required
-                className="w-full bg-slate-50 text-slate-900 px-10 py-3.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder-slate-400 text-sm font-bold"
+                className="w-full bg-white text-slate-900 px-10 py-3.5 rounded-lg border border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 outline-none transition-all placeholder-slate-400 text-sm font-bold"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -128,26 +154,6 @@ const Auth: React.FC<AuthProps> = ({ onLogin }) => {
                 {isLoading ? 'Verifying...' : 'Secure Login'}
               </button>
             </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {[
-                { title: 'Student', u: 'student', p: '1234', icon: BookOpen, color: 'text-blue-600' },
-                { title: 'Warden', u: 'warden', p: 'admin', icon: Shield, color: 'text-purple-600' },
-                { title: 'Worker', u: 'worker', p: 'work', icon: PenTool, color: 'text-orange-600' },
-                { title: 'Admin', u: 'admin', p: 'root', icon: Lock, color: 'text-slate-600' }
-              ].map((cred) => (
-                <div key={cred.title} className="p-2 bg-slate-50 border border-slate-100 rounded cursor-pointer hover:bg-blue-50 hover:border-blue-100 transition-colors group"
-                     onClick={() => { setRegNo(cred.u); setPassword(cred.p); }}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <cred.icon size={14} className={cred.color} />
-                    <p className="text-[10px] text-slate-500 font-bold tracking-widest uppercase group-hover:text-blue-600">
-                      {cred.title} Login
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
           </form>
         </div>
       </div>

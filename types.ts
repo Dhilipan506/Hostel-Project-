@@ -51,23 +51,22 @@ export interface Complaint {
   urgency: Urgency;
   status: ComplaintStatus;
   workerStatus?: WorkerStatus; 
-  workerAccepted?: boolean; // New field for accept/reject flow
+  workerAccepted?: boolean; 
   submittedAt: string;
   estimatedCompletion?: string; 
   startDate?: string; 
   completionTime?: string; 
   wardenNote?: string;
   assignedWorker?: string;
+  assignedWorkerId?: string; // For fetching worker image
   rejectionReason?: string;
   
-  // Delay & Extension Logic
   isDelayed?: boolean;
   delayReason?: string; 
   wardenDelayResponse?: string; 
   extensionReason?: string; 
   adminFlagged?: boolean; 
   
-  // Worker Workflow & Parts
   proofImages?: {
     reached?: string;
     working?: string;
@@ -127,7 +126,7 @@ export interface LeaveRequest {
 
 export type UserRole = 'student' | 'warden' | 'worker' | 'admin';
 
-export type WorkerAvailability = 'Free' | 'Busy' | 'Unavailable';
+export type WorkerAvailability = 'Free' | 'Busy' | 'Unavailable' | 'Working';
 
 export interface User {
   registerNumber: string;
@@ -147,6 +146,10 @@ export interface User {
   // Worker Specific
   workCategory?: string;
   currentStatus?: WorkerAvailability;
+
+  // Blocking logic
+  isBlocked?: boolean;
+  blockedUntil?: string;
 }
 
 export interface UserRequest {
@@ -154,16 +157,47 @@ export interface UserRequest {
   requestedBy: string;
   userType: 'student' | 'worker';
   name: string;
-  identifier: string; // RegNo or WorkerID
+  identifier: string; 
   status: 'Pending' | 'Approved' | 'Rejected';
   phoneNumber: string;
   dob: string;
-
-  // Detailed Fields for creation
   fatherName?: string;
   bloodGroup?: string;
   address?: string;
   hostelValidUpto?: string;
   roomNumber?: string;
-  workCategory?: string; // Typing format e.g., "Electrical"
+  workCategory?: string; 
+}
+
+export interface ProfileChangeRequest {
+  id: string;
+  userId: string;
+  userName: string;
+  userRole: UserRole;
+  type: 'Password Change' | 'Details Update';
+  reason: string;
+  requestedDate: string;
+  status: 'Pending' | 'Approved' | 'Rejected';
+}
+
+export interface DisciplinaryAction {
+  id: string;
+  studentName: string;
+  studentId: string;
+  reason: string;
+  date: string;
+  reportedBy: string;
+  status: 'Reported' | 'Action Taken' | 'Dismissed';
+  actionTaken?: string;
+  blockDurationDays?: number;
+  proofImage?: string;
+}
+
+export interface Notification {
+  id: string;
+  title: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  targetRole: UserRole | 'all';
 }

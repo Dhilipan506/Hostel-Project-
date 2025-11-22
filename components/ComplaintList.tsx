@@ -1,13 +1,14 @@
 
 import React, { useState } from 'react';
 import { Complaint, ComplaintStatus, Urgency, UserRole, WorkerStatus, User, WorkerAvailability } from '../types';
-import { Clock, CheckCircle2, Star, MessageSquare, UserCog, Ban, Trash2, PlayCircle, CheckSquare, Calendar, MapPin, Activity, Wrench, ArrowRight, Loader2, AlertTriangle, AlertOctagon, History, Send, Camera, Package, Check, X } from 'lucide-react';
-import { moderateContent, validateExtensionReason, fileToGenerativePart, validateWorkerEvidence } from '../services/geminiService';
+import { Clock, CheckCircle2, Star, MessageSquare, UserCog, Ban, Trash2, PlayCircle, CheckSquare, Calendar, MapPin, Activity, Wrench, ArrowRight, Loader2, AlertTriangle, AlertOctagon, History, Send, Camera, Package, Check, X, Eye, Image as ImageIcon } from 'lucide-react';
+import { validateExtensionReason, fileToGenerativePart, validateWorkerEvidence } from '../services/geminiService';
 
 interface ComplaintListProps {
   complaints: Complaint[];
   userRole: UserRole;
-  availableWorkers?: User[]; // Passed from App for Warden View
+  availableWorkers?: User[]; 
+  currentUser?: User;
   onReviewSubmit: (id: string, rating: number, comment: string) => void;
   onUpdateStatus: (id: string, status: ComplaintStatus, updates?: Partial<Complaint>) => void;
   onDelete?: (id: string) => void;
@@ -25,7 +26,12 @@ const StatusBadge: React.FC<{ status: ComplaintStatus }> = ({ status }) => {
   return <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${colors[status]}`}>{status}</span>;
 };
 
-const LiveTracking: React.FC<{ status: ComplaintStatus, workerStatus?: WorkerStatus }> = ({ status, workerStatus }) => {
+const LiveTracking: React.FC<{ 
+  status: ComplaintStatus, 
+  workerStatus?: WorkerStatus,
+  assignedWorker?: string,
+  workerImage?: string
+}> = ({ status, workerStatus, assignedWorker, workerImage }) => {
   const steps = [
     { label: 'Raised', active: true },
     { label: 'Approved', active: status !== ComplaintStatus.SUBMITTED && status !== ComplaintStatus.REJECTED },
@@ -39,16 +45,37 @@ const LiveTracking: React.FC<{ status: ComplaintStatus, workerStatus?: WorkerSta
   }
 
   return (
-    <div className="flex items-center justify-between w-full mt-4 relative">
-      <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
-      {steps.map((step, idx) => (
-        <div key={idx} className="flex flex-col items-center bg-white px-1">
-           <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${step.active ? 'border-blue-600 bg-blue-600' : 'border-slate-300 bg-white'}`}>
-             {step.active && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
-           </div>
-           <span className={`text-[9px] font-bold uppercase mt-1 ${step.active ? 'text-blue-600' : 'text-slate-400'}`}>{step.label}</span>
-        </div>
-      ))}
+    <div className="mt-6 relative">
+      <div className="flex items-center justify-between w-full relative z-10">
+        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-slate-200 -z-10"></div>
+        {steps.map((step, idx) => (
+          <div key={idx} className="flex flex-col items-center bg-white px-1">
+             <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${step.active ? 'border-blue-600 bg-blue-600 scale-110' : 'border-slate-300 bg-white'}`}>
+               {step.active && <div className="w-1.5 h-1.5 bg-white rounded-full"></div>}
+             </div>
+             <span className={`text-[9px] font-bold uppercase mt-1 ${step.active ? 'text-blue-600' : 'text-slate-400'}`}>{step.label}</span>
+          </div>
+        ))}
+      </div>
+      
+      {/* Worker Profile in Timeline */}
+      {(status === ComplaintStatus.ASSIGNED || status === ComplaintStatus.IN_PROGRESS) && assignedWorker && (
+         <div className="mt-4 flex justify-center animate-in fade-in slide-in-from-top-2">
+            <div className="bg-white border border-slate-200 shadow-sm px-3 py-1.5 rounded-full flex items-center gap-2">
+               <div className="w-6 h-6 rounded-full overflow-hidden bg-slate-100">
+                 {workerImage ? (
+                    <img src={workerImage} className="w-full h-full object-cover" alt="Worker"/>
+                 ) : (
+                    <UserCog size={16} className="text-slate-400 m-1"/>
+                 )}
+               </div>
+               <div>
+                 <p className="text-[9px] text-slate-400 uppercase font-bold">Current Status</p>
+                 <p className="text-[10px] text-blue-600 font-bold uppercase">{workerStatus || 'Assigned'}</p>
+               </div>
+            </div>
+         </div>
+      )}
     </div>
   );
 };
@@ -69,7 +96,7 @@ const ComplaintCard: React.FC<{
   const [isProcessing, setIsProcessing] = useState(false);
   const [rejectionReason, setRejectionReason] = useState('');
   const [showAssignModal, setShowAssignModal] = useState(false);
-  const [selectedWorker, setSelectedWorker] = useState('');
+  const [selectedWorker, setSelectedWorker] = useState<{name: string, id: string} | null>(null);
   const [showProofUpload, setShowProofUpload] = useState(false);
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [proofStage, setProofStage] = useState<'reached' | 'working' | 'completed'>('reached');
@@ -78,12 +105,15 @@ const ComplaintCard: React.FC<{
   const [delayReason, setDelayReason] = useState('');
   const [showDelayModal, setShowDelayModal] = useState(false);
   
-  // Parts
-  const [partsDesc, setPartsDesc] = useState('');
-  const [showPartsModal, setShowPartsModal] = useState(false);
+  // Image Modals
+  const [viewStudentImage, setViewStudentImage] = useState(false);
+  const [viewWorkerProof, setViewWorkerProof] = useState<string | null>(null);
 
   // Deadline Logic
   const isDeadlinePassed = complaint.estimatedCompletion && new Date() > new Date(complaint.estimatedCompletion);
+
+  // Get Assigned Worker Image
+  const assignedWorkerObj = workersList?.find(w => w.registerNumber === complaint.assignedWorkerId);
 
   // Warden Actions
   const handleApprove = () => onUpdate(ComplaintStatus.APPROVED);
@@ -98,9 +128,10 @@ const ComplaintCard: React.FC<{
       const now = new Date();
       const estimated = new Date(now.getTime() + 48 * 60 * 60 * 1000); // Default 2 days
       onUpdate(ComplaintStatus.ASSIGNED, { 
-        assignedWorker: selectedWorker,
+        assignedWorker: selectedWorker.name,
+        assignedWorkerId: selectedWorker.id,
         estimatedCompletion: estimated.toISOString(),
-        workerAccepted: false, // Reset accept status for new assignment
+        workerAccepted: false, 
         workerStatus: WorkerStatus.ASSIGNED
       });
       setShowAssignModal(false);
@@ -116,8 +147,9 @@ const ComplaintCard: React.FC<{
   };
 
   const handleWorkerReject = () => {
-    onUpdate(ComplaintStatus.APPROVED, { // Revert to Approved so Warden can re-assign
+    onUpdate(ComplaintStatus.APPROVED, { 
       assignedWorker: undefined,
+      assignedWorkerId: undefined,
       workerAccepted: false,
       workerStatus: undefined,
       wardenNote: `Worker rejected task. Reason: Busy/Unavailable.` 
@@ -139,7 +171,7 @@ const ComplaintCard: React.FC<{
       }
       
       if (!isValid) {
-        alert(`Proof Rejected by AI: ${reason}`);
+        alert(`Proof Rejected by System: ${reason}`);
         setIsProcessing(false);
         return;
       }
@@ -154,7 +186,7 @@ const ComplaintCard: React.FC<{
 
       if (proofStage === 'reached') {
         newWorkerStatus = WorkerStatus.REACHED;
-        newStatus = ComplaintStatus.IN_PROGRESS; // Work Officially Starts
+        newStatus = ComplaintStatus.IN_PROGRESS; 
       } else if (proofStage === 'working') {
         newWorkerStatus = WorkerStatus.REPAIRING;
       } else if (proofStage === 'completed') {
@@ -184,7 +216,7 @@ const ComplaintCard: React.FC<{
     onUpdate(complaint.status, {
       extensionReason,
       adminFlagged: check.flagForAdmin,
-      estimatedCompletion: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() // Add 1 day mock
+      estimatedCompletion: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString() 
     });
     setShowExtensionModal(false);
   };
@@ -196,20 +228,20 @@ const ComplaintCard: React.FC<{
     }
   };
 
-  // Worker availability color helper
-  const getStatusColor = (status?: WorkerAvailability) => {
-     if (status === 'Free') return 'text-green-600 bg-green-50';
-     if (status === 'Busy') return 'text-orange-600 bg-orange-50';
-     return 'text-red-600 bg-red-50';
-  };
+  // Styles based on role
+  const cardBorder = userRole === 'warden' ? 'border-teal-100' : userRole === 'worker' ? 'border-orange-100' : 'border-blue-100';
+  const buttonPrimary = userRole === 'warden' ? 'bg-teal-600 hover:bg-teal-700' : userRole === 'worker' ? 'bg-orange-600 hover:bg-orange-700' : 'bg-blue-600 hover:bg-blue-700';
 
   return (
-    <div className={`bg-white rounded-xl shadow-sm border p-5 mb-4 transition-all hover:shadow-md ${complaint.urgency === Urgency.CRITICAL ? 'border-red-200 bg-red-50/10' : 'border-slate-100'}`}>
+    <div className={`bg-white rounded-xl shadow-sm border p-5 mb-4 transition-all hover:shadow-md ${cardBorder} ${complaint.urgency === Urgency.CRITICAL ? 'border-l-4 border-l-red-500' : ''}`}>
       {/* Header */}
       <div className="flex justify-between items-start mb-3">
         <div className="flex gap-3 items-start">
-          <div className="w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0">
+          <div className="relative w-16 h-16 rounded-lg overflow-hidden bg-slate-100 flex-shrink-0 cursor-pointer group" onClick={() => setViewStudentImage(true)}>
              <img src={complaint.imageUrl} alt="Issue" className="w-full h-full object-cover" />
+             <div className="absolute inset-0 bg-black/20 hidden group-hover:flex items-center justify-center">
+               <Eye className="text-white" size={16} />
+             </div>
           </div>
           <div>
              <div className="flex items-center gap-2">
@@ -232,36 +264,41 @@ const ComplaintCard: React.FC<{
            {complaint.submittedAt && (
              <p className="text-[10px] text-slate-400 font-bold mt-1">{new Date(complaint.submittedAt).toLocaleDateString()}</p>
            )}
-           {userRole === 'admin' && onDelete && (
-             <button onClick={() => onDelete(complaint.id)} className="mt-2 text-slate-300 hover:text-red-500"><Trash2 size={14}/></button>
-           )}
         </div>
       </div>
 
       {/* Content */}
       <p className="text-xs text-slate-600 mb-4 bg-slate-50 p-2 rounded border border-slate-100">
-        <span className="font-bold">AI Summary:</span> {complaint.cleanDescription}
+        <span className="font-bold">System Summary:</span> {complaint.cleanDescription}
       </p>
-
-      {/* Worker Assignment Info */}
-      {complaint.assignedWorker && (
-        <div className="mb-3 flex items-center justify-between bg-blue-50/50 p-2 rounded border border-blue-100">
-           <div className="flex items-center gap-2">
-             <UserCog size={14} className="text-blue-600" />
-             <span className="text-xs font-bold text-blue-900 uppercase">{complaint.assignedWorker}</span>
-           </div>
-           <span className="text-[10px] font-bold uppercase text-blue-400">{complaint.workerStatus || 'Assigned'}</span>
+      
+      {/* STUDENT VIEWING WORKER PROOF */}
+      {complaint.proofImages && (
+        <div className="mb-4 flex gap-2">
+            {complaint.proofImages.reached && (
+                <button onClick={() => setViewWorkerProof(complaint.proofImages?.reached || null)} className="text-[10px] font-bold uppercase flex items-center gap-1 bg-slate-50 px-2 py-1 rounded hover:bg-slate-100">
+                    <ImageIcon size={10} /> Worker Reached
+                </button>
+            )}
+            {complaint.proofImages.working && (
+                <button onClick={() => setViewWorkerProof(complaint.proofImages?.working || null)} className="text-[10px] font-bold uppercase flex items-center gap-1 bg-slate-50 px-2 py-1 rounded hover:bg-slate-100">
+                    <ImageIcon size={10} /> Work in Progress
+                </button>
+            )}
+            {complaint.proofImages.completed && (
+                <button onClick={() => setViewWorkerProof(complaint.proofImages?.completed || null)} className="text-[10px] font-bold uppercase flex items-center gap-1 bg-green-50 text-green-700 px-2 py-1 rounded hover:bg-green-100">
+                    <ImageIcon size={10} /> Completion Proof
+                </button>
+            )}
         </div>
       )}
-      
-      {/* Deadline Warning */}
-      {isDeadlinePassed && complaint.status !== ComplaintStatus.COMPLETED && (
-         <div className="mb-3 flex items-center gap-2 text-red-600 bg-red-50 p-2 rounded text-xs font-bold uppercase">
-            <AlertOctagon size={14} /> Deadline Passed: {new Date(complaint.estimatedCompletion!).toLocaleDateString()}
-         </div>
-      )}
 
-      <LiveTracking status={complaint.status} workerStatus={complaint.workerStatus} />
+      <LiveTracking 
+        status={complaint.status} 
+        workerStatus={complaint.workerStatus} 
+        assignedWorker={complaint.assignedWorker}
+        workerImage={assignedWorkerObj?.profileImage}
+      />
 
       {/* ACTION BUTTONS */}
       <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-2 justify-end">
@@ -275,26 +312,18 @@ const ComplaintCard: React.FC<{
              Write Review
            </button>
          )}
-         {userRole === 'student' && isDeadlinePassed && complaint.status !== ComplaintStatus.COMPLETED && !complaint.isDelayed && (
-           <button 
-            onClick={() => setShowDelayModal(true)}
-            className="bg-red-100 text-red-700 px-3 py-1.5 rounded text-xs font-bold uppercase hover:bg-red-200"
-           >
-             Report Delay
-           </button>
-         )}
 
          {/* WARDEN ACTIONS */}
          {userRole === 'warden' && complaint.status === ComplaintStatus.SUBMITTED && (
            <>
-             <button onClick={handleApprove} className="bg-green-600 text-white px-4 py-2 rounded text-xs font-bold uppercase hover:bg-green-700 flex items-center">
+             <button onClick={handleApprove} className="bg-teal-600 text-white px-4 py-2 rounded text-xs font-bold uppercase hover:bg-teal-700 flex items-center">
                <CheckCircle2 size={14} className="mr-1"/> Approve
              </button>
              <div className="flex items-center gap-1">
                <input 
                  type="text" 
-                 placeholder="Reason for rejection" 
-                 className="text-xs border rounded px-2 py-2 w-32 outline-none focus:border-red-300"
+                 placeholder="Reason..." 
+                 className="text-xs border rounded px-2 py-2 w-24 outline-none bg-white focus:border-red-300"
                  value={rejectionReason}
                  onChange={e => setRejectionReason(e.target.value)}
                />
@@ -312,17 +341,17 @@ const ComplaintCard: React.FC<{
                      {workersList?.map(w => (
                        <button 
                         key={w.registerNumber} 
-                        onClick={() => setSelectedWorker(`${w.name} (${w.workCategory || 'General'})`)}
-                        className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-slate-50 flex justify-between ${selectedWorker.includes(w.name) ? 'bg-blue-50 text-blue-700' : 'text-slate-700'}`}
+                        onClick={() => setSelectedWorker({name: `${w.name} (${w.workCategory || 'General'})`, id: w.registerNumber})}
+                        className={`w-full text-left text-xs px-2 py-1.5 rounded hover:bg-slate-50 flex justify-between ${selectedWorker?.id === w.registerNumber ? 'bg-teal-50 text-teal-700' : 'text-slate-700'}`}
                        >
                          <span className="font-bold">{w.name}</span>
-                         <span className={`text-[9px] px-1.5 rounded ${getStatusColor(w.currentStatus || 'Free')}`}>{w.currentStatus || 'Free'}</span>
+                         <span className={`text-[9px] px-1.5 rounded ${w.currentStatus === 'Free' ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'}`}>{w.currentStatus || 'Free'}</span>
                        </button>
                      ))}
                   </div>
                   <div className="flex justify-end gap-2">
                     <button onClick={() => setShowAssignModal(false)} className="text-[10px] font-bold uppercase text-slate-400">Cancel</button>
-                    <button onClick={handleAssign} className="bg-blue-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase">Confirm</button>
+                    <button onClick={handleAssign} className="bg-teal-600 text-white px-3 py-1 rounded text-[10px] font-bold uppercase">Confirm</button>
                   </div>
                </div>
              ) : (
@@ -331,27 +360,6 @@ const ComplaintCard: React.FC<{
                </button>
              )}
            </div>
-         )}
-
-         {userRole === 'warden' && isDeadlinePassed && complaint.status !== ComplaintStatus.COMPLETED && (
-            <div className="relative">
-               {showExtensionModal ? (
-                 <div className="absolute bottom-full right-0 mb-2 bg-white shadow-xl border border-slate-200 p-3 rounded-lg z-10 w-64">
-                    <h4 className="text-xs font-bold uppercase text-slate-500 mb-2">Extend Deadline</h4>
-                    <textarea 
-                      className="w-full border p-2 text-xs rounded mb-2" 
-                      placeholder="Why is it delayed?"
-                      value={extensionReason}
-                      onChange={e => setExtensionReason(e.target.value)}
-                    />
-                    <button onClick={handleExtensionRequest} className="w-full bg-slate-900 text-white py-1 rounded text-[10px] font-bold uppercase">Update</button>
-                 </div>
-               ) : (
-                 <button onClick={() => setShowExtensionModal(true)} className="bg-orange-100 text-orange-700 px-3 py-2 rounded text-xs font-bold uppercase hover:bg-orange-200 flex items-center">
-                   <Clock size={14} className="mr-1"/> Extend Deadline
-                 </button>
-               )}
-            </div>
          )}
 
          {/* WORKER ACTIONS */}
@@ -371,7 +379,7 @@ const ComplaintCard: React.FC<{
              <button 
                onClick={() => { setProofStage('reached'); setShowProofUpload(true); }}
                disabled={!!complaint.proofImages?.reached}
-               className={`px-3 py-2 rounded text-xs font-bold uppercase flex items-center ${complaint.proofImages?.reached ? 'bg-green-50 text-green-600 cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600'}`}
+               className={`px-3 py-2 rounded text-xs font-bold uppercase flex items-center ${complaint.proofImages?.reached ? 'bg-green-50 text-green-600 cursor-default' : 'bg-white border border-slate-200 text-slate-600 hover:bg-orange-50 hover:text-orange-600'}`}
              >
                <MapPin size={14} className="mr-1"/> {complaint.proofImages?.reached ? 'Reached' : 'Mark Reached'}
              </button>
@@ -380,7 +388,7 @@ const ComplaintCard: React.FC<{
                <button 
                   onClick={() => { setProofStage('working'); setShowProofUpload(true); }}
                   disabled={!!complaint.proofImages?.working}
-                  className={`px-3 py-2 rounded text-xs font-bold uppercase flex items-center ${complaint.proofImages?.working ? 'bg-green-50 text-green-600 cursor-default' : 'bg-slate-100 text-slate-600 hover:bg-blue-50 hover:text-blue-600'}`}
+                  className={`px-3 py-2 rounded text-xs font-bold uppercase flex items-center ${complaint.proofImages?.working ? 'bg-green-50 text-green-600 cursor-default' : 'bg-white border border-slate-200 text-slate-600 hover:bg-orange-50 hover:text-orange-600'}`}
                >
                  <Wrench size={14} className="mr-1"/> {complaint.proofImages?.working ? 'Work Started' : 'Start Work'}
                </button>
@@ -409,7 +417,7 @@ const ComplaintCard: React.FC<{
             ))}
           </div>
           <textarea 
-            className="w-full p-2 rounded border border-blue-200 text-xs mb-2 outline-none"
+            className="w-full p-2 rounded border border-blue-200 text-xs mb-2 outline-none bg-white"
             placeholder="Optional comment..."
             value={comment}
             onChange={e => setComment(e.target.value)}
@@ -432,14 +440,12 @@ const ComplaintCard: React.FC<{
                   <Camera size={32} className="text-slate-400 mb-2"/>
                   <input type="file" accept="image/*" onChange={e => setProofFile(e.target.files?.[0] || null)} className="text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
                </div>
-               {proofStage !== 'reached' && (
-                 <p className="text-[10px] text-blue-600 mb-4 bg-blue-50 p-2 rounded flex items-center gap-2">
-                   <Activity size={12}/> AI will verify if this matches the issue.
-                 </p>
-               )}
+               <p className="text-[10px] text-blue-600 mb-4 bg-blue-50 p-2 rounded flex items-center gap-2">
+                  <Activity size={12}/> Photo will be visible to Student.
+               </p>
                <div className="flex justify-end gap-2">
                   <button onClick={() => setShowProofUpload(false)} className="text-xs font-bold uppercase text-slate-400 px-3">Cancel</button>
-                  <button onClick={handleProofUpload} disabled={isProcessing || !proofFile} className="bg-blue-600 text-white px-4 py-2 rounded text-xs font-bold uppercase flex items-center disabled:opacity-50">
+                  <button onClick={handleProofUpload} disabled={isProcessing || !proofFile} className={`${buttonPrimary} text-white px-4 py-2 rounded text-xs font-bold uppercase flex items-center disabled:opacity-50`}>
                      {isProcessing ? <Loader2 className="animate-spin mr-2" size={14}/> : 'Upload'}
                   </button>
                </div>
@@ -447,25 +453,30 @@ const ComplaintCard: React.FC<{
          </div>
       )}
 
-      {/* Report Delay Modal */}
-      {showDelayModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
-               <h3 className="font-bold uppercase text-red-600 text-sm mb-4">Report Delay</h3>
-               <p className="text-xs text-slate-500 mb-3">Why is this not completed yet?</p>
-               <textarea value={delayReason} onChange={e => setDelayReason(e.target.value)} className="w-full border p-2 text-sm rounded mb-4" rows={3} placeholder="e.g. Worker never came..."/>
-               <div className="flex justify-end gap-2">
-                 <button onClick={() => setShowDelayModal(false)} className="text-xs font-bold uppercase text-slate-400 px-3">Cancel</button>
-                 <button onClick={handleDelayReport} className="bg-red-600 text-white px-4 py-2 rounded text-xs font-bold uppercase">Report</button>
-               </div>
-            </div>
-        </div>
+      {/* VIEW IMAGE MODAL (Student Complaint) */}
+      {viewStudentImage && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewStudentImage(false)}>
+             <div className="max-w-2xl w-full bg-white rounded-lg overflow-hidden relative p-2">
+                 <img src={complaint.imageUrl} className="w-full h-auto rounded" alt="Evidence"/>
+                 <button className="absolute top-4 right-4 bg-white text-black p-2 rounded-full"><X size={16}/></button>
+             </div>
+         </div>
+      )}
+
+      {/* VIEW PROOF IMAGE MODAL (Worker Proof) */}
+      {viewWorkerProof && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={() => setViewWorkerProof(null)}>
+             <div className="max-w-2xl w-full bg-white rounded-lg overflow-hidden relative p-2">
+                 <img src={viewWorkerProof} className="w-full h-auto rounded" alt="Proof"/>
+                 <button className="absolute top-4 right-4 bg-white text-black p-2 rounded-full"><X size={16}/></button>
+             </div>
+         </div>
       )}
     </div>
   );
 };
 
-const ComplaintList: React.FC<ComplaintListProps> = ({ complaints, userRole, availableWorkers, onReviewSubmit, onUpdateStatus, onDelete }) => {
+const ComplaintList: React.FC<ComplaintListProps> = ({ complaints, userRole, availableWorkers, currentUser, onReviewSubmit, onUpdateStatus, onDelete }) => {
   if (complaints.length === 0) {
     return (
       <div className="text-center py-20 bg-white rounded-xl border border-dashed border-slate-200">
